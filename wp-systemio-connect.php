@@ -19,6 +19,17 @@ if ( ! defined( 'ABSPATH' ) ) {
 
 
 
-echo "<!-- WP Systeme.io Connect est chargé (version basique) -->"; // Juste pour vérifier qu'il se charge, on enlèvera ça plus tard
+// Définir des constantes utiles pour le plugin
+define( 'WPSIO_CONNECT_VERSION', '0.1.0' );
+define( 'WPSIO_CONNECT_PATH', plugin_dir_path( __FILE__ ) ); // Chemin système vers le dossier du plugin (avec / final)
+define( 'WPSIO_CONNECT_URL', plugin_dir_url( __FILE__ ) );   // URL vers le dossier du plugin (avec / final)
+define( 'WPSIO_CONNECT_PLUGIN_BASENAME', plugin_basename( __FILE__ ) ); // Utile pour les liens internes admin
+
+// Inclure la classe principale pour l'admin (nous allons la créer juste après)
+require_once WPSIO_CONNECT_PATH . 'admin/class-wp-systemio-connect-admin.php';
+
+// Initialiser les fonctionnalités d'administration
+WP_Systemio_Connect_Admin::init();
+
 
 ?>

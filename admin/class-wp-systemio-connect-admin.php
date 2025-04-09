@@ -160,36 +160,6 @@ class WP_Systemio_Connect_Admin
         <?php
     }
 
-
-    /**
-     * Nettoie les options avant de les sauvegarder dans la base de données.
-     * Très important pour la sécurité !
-     */
-    public static function sanitize_options($input)
-    {
-        $sanitized_options = [];
-
-        if (isset($input['api_key'])) {
-            // Ne pas utiliser sanitize_text_field qui pourrait casser la clé.
-            // Utiliser wp_kses avec un tableau vide pour supprimer tout HTML/JS potentiel,
-            // mais garder les caractères de la clé. trim() enlève les espaces avant/après.
-            $sanitized_options['api_key'] = trim(wp_kses($input['api_key'], []));
-        }
-
-        if (isset($input['api_base_url'])) {
-            // Valider que c'est une URL, sinon remettre la valeur par défaut ou vider ?
-            $url = esc_url_raw(trim($input['api_base_url']));
-            // Si l'URL n'est pas valide ou est vide, on peut remettre la valeur par défaut
-            if (empty($url) || filter_var($url, FILTER_VALIDATE_URL) === false) {
-                $sanitized_options['api_base_url'] = 'https://api.systeme.io/api';
-            } else {
-                $sanitized_options['api_base_url'] = $url;
-            }
-        }
-
-        return $sanitized_options;
-    }
-
     /**
      * Affiche le contenu HTML de la page d'options.
      */
@@ -560,6 +530,91 @@ class WP_Systemio_Connect_Admin
             });
         </script>
         <?php
+    }
+
+    /**
+     * Nettoie les options avant de les sauvegarder dans la base de données.
+     * Très important pour la sécurité !
+     */
+    public static function sanitize_options($input)
+    {
+        // $input contient toutes les données soumises par le formulaire de réglages
+        $sanitized_options = [];
+
+        // --- Nettoyage des options API (comme avant) ---
+        if (isset($input['api_key'])) {
+            $sanitized_options['api_key'] = trim(wp_kses($input['api_key'], []));
+        }
+        if (isset($input['api_base_url'])) {
+            $url = esc_url_raw(trim($input['api_base_url']));
+            if (empty($url) || filter_var($url, FILTER_VALIDATE_URL) === false) {
+                $sanitized_options['api_base_url'] = 'https://api.systeme.io/api';
+            } else {
+                $sanitized_options['api_base_url'] = $url;
+            }
+        }
+
+        // --- NOUVEAU: Nettoyage des options d'intégration CF7 ---
+        if (isset($input['cf7_integrations']) && is_array($input['cf7_integrations'])) {
+            $sanitized_cf7 = [];
+            foreach ($input['cf7_integrations'] as $form_id => $settings) {
+                // S'assurer que form_id est un entier positif
+                $form_id = absint($form_id);
+                if ($form_id <= 0 || !is_array($settings)) {
+                    continue; // Ignorer les entrées invalides
+                }
+
+                $sanitized_settings = [];
+                // Nettoyer chaque champ de réglage pour ce formulaire
+                $sanitized_settings['enabled'] = isset($settings['enabled']) ? (bool) $settings['enabled'] : false;
+
+                // Si le formulaire n'est pas activé, on peut ignorer les autres champs ou les garder vides
+                if ($sanitized_settings['enabled']) {
+                    $sanitized_settings['email_field'] = isset($settings['email_field']) ? sanitize_text_field($settings['email_field']) : '';
+                    $sanitized_settings['fname_field'] = isset($settings['fname_field']) ? sanitize_text_field($settings['fname_field']) : '';
+                    $sanitized_settings['lname_field'] = isset($settings['lname_field']) ? sanitize_text_field($settings['lname_field']) : '';
+
+                    // Nettoyer les tags : enlever espaces, garder chiffres et virgules
+                    if (isset($settings['tags'])) {
+                        $tags_raw = sanitize_text_field($settings['tags']);
+                        // Enlever tout sauf les chiffres et les virgules, puis nettoyer les virgules multiples ou en début/fin
+                        $tags_cleaned = preg_replace('/[^0-9,]/', '', $tags_raw);
+                        $tags_cleaned = trim(preg_replace('/,+/', ',', $tags_cleaned), ',');
+                        $sanitized_settings['tags'] = $tags_cleaned;
+                    } else {
+                        $sanitized_settings['tags'] = '';
+                    }
+
+                    // **Validation importante** : S'assurer que le champ email est bien renseigné si activé
+                    if (empty($sanitized_settings['email_field'])) {
+                        // Peut-être désactiver automatiquement ou afficher une erreur ?
+                        // Pour l'instant, on le laisse mais ce n'est pas idéal.
+                        add_settings_error(
+                            'wp_systemio_connect_options',
+                            'cf7_email_missing_' . $form_id,
+                            sprintf(__('Attention : Le champ Email est obligatoire pour le formulaire CF7 ID %d lorsqu\'il est activé pour Systeme.io.', 'wp-systemio-connect'), $form_id),
+                            'warning' // Ou 'error' si on veut être plus strict
+                        );
+                        // On pourrait forcer enabled à false ici:
+                        // $sanitized_settings['enabled'] = false;
+                    }
+
+                } else {
+                    // Si désactivé, on sauvegarde quand même les champs vides pour ne pas perdre la config
+                    $sanitized_settings['email_field'] = isset($settings['email_field']) ? sanitize_text_field($settings['email_field']) : '';
+                    $sanitized_settings['fname_field'] = isset($settings['fname_field']) ? sanitize_text_field($settings['fname_field']) : '';
+                    $sanitized_settings['lname_field'] = isset($settings['lname_field']) ? sanitize_text_field($settings['lname_field']) : '';
+                    $sanitized_settings['tags'] = isset($settings['tags']) ? preg_replace('/[^0-9,]/', '', sanitize_text_field($settings['tags'])) : '';
+                    $sanitized_settings['tags'] = trim(preg_replace('/,+/', ',', $sanitized_settings['tags']), ',');
+                }
+
+
+                $sanitized_cf7[$form_id] = $sanitized_settings;
+            }
+            $sanitized_options['cf7_integrations'] = $sanitized_cf7;
+        }
+
+        return $sanitized_options;
     }
 } // Fin de la classe WP_Systemio_Connect_Admin
 

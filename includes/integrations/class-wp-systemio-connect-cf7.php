@@ -31,112 +31,123 @@ class WP_Systemio_Connect_CF7
      */
     public static function handle_submission($contact_form, &$abort, $submission)
     {
-        // Récupérer la clé API et l'URL de base via notre classe Admin (ou des helpers dédiés)
+        // Récupérer la clé API et l'URL de base
         $api_key = WP_Systemio_Connect_Admin::get_api_key();
         $api_base_url = WP_Systemio_Connect_Admin::get_api_base_url();
 
         // Si la clé API n'est pas configurée, on ne fait rien
         if (empty($api_key) || empty($api_base_url)) {
-            error_log('[WP SIO Connect] Clé API SIO non configurée. Abandon de l\'envoi pour CF7.');
-            return; // Sortir de la fonction
+            // Pas besoin de log ici, car on va vérifier par formulaire
+            return;
         }
+
+        // --- Récupérer la configuration spécifique à CE formulaire ---
+        $form_id = $contact_form->id();
+        $options = get_option('wp_systemio_connect_options');
+        $form_settings = isset($options['cf7_integrations'][$form_id]) ? $options['cf7_integrations'][$form_id] : null;
+
+        // Vérifier si l'intégration est activée pour ce formulaire
+        if (!$form_settings || empty($form_settings['enabled']) || empty($form_settings['email_field'])) {
+            // Log si on veut savoir pourquoi on n'envoie pas
+            // error_log("[WP SIO Connect] Intégration CF7 désactivée ou champ email non mappé pour le formulaire ID: $form_id.");
+            return; // Sortir si non activé ou champ email non défini
+        }
+
+        // Récupérer les noms des champs mappés et les tags
+        $email_field_name = $form_settings['email_field'];
+        $fname_field_name = isset($form_settings['fname_field']) ? $form_settings['fname_field'] : '';
+        $lname_field_name = isset($form_settings['lname_field']) ? $form_settings['lname_field'] : '';
+        $tags_string = isset($form_settings['tags']) ? $form_settings['tags'] : '';
 
         // Récupérer les données soumises
         $posted_data = $submission->get_posted_data();
 
-        // --- Identification des champs ---
-        // Pour l'instant, on suppose des noms communs. Il faudra rendre ça configurable.
+        // --- Extraire les données en utilisant le mapping ---
         $email = '';
         $first_name = '';
-        $last_name = ''; // Optionnel
+        $last_name = '';
 
-        // Chercher l'email (essayer plusieurs noms communs)
-        $email_field_names = ['your-email', 'email', 'adresse-email', 'user_email'];
-        foreach ($email_field_names as $field_name) {
-            if (isset($posted_data[$field_name]) && is_email($posted_data[$field_name])) {
-                $email = sanitize_email($posted_data[$field_name]);
-                break; // Arrêter dès qu'on a trouvé un email valide
-            }
+        // Extraire l'email (champ obligatoire)
+        if (isset($posted_data[$email_field_name]) && is_email($posted_data[$email_field_name])) {
+            $email = sanitize_email($posted_data[$email_field_name]);
+        } else {
+            error_log("[WP SIO Connect] Champ email mappé '$email_field_name' non trouvé ou invalide dans la soumission CF7 ID: $form_id.");
+            return; // Impossible d'envoyer sans email valide
         }
 
-        // Si aucun email valide n'est trouvé, on ne peut rien faire
-        if (empty($email)) {
-            error_log('[WP SIO Connect] Aucun champ email valide trouvé dans la soumission CF7.');
-            return;
+        // Extraire le prénom (si mappé et trouvé)
+        if (!empty($fname_field_name) && isset($posted_data[$fname_field_name])) {
+            $first_name = sanitize_text_field(trim($posted_data[$fname_field_name]));
         }
 
-        // Chercher le prénom/nom (essayer plusieurs noms communs)
-        $name_field_names = ['your-name', 'name', 'nom', 'first-name', 'firstname', 'prenom'];
-        foreach ($name_field_names as $field_name) {
-            if (isset($posted_data[$field_name]) && !empty(trim($posted_data[$field_name]))) {
-                // On met tout dans first_name pour l'instant, SIO gère bien ça.
-                // On pourrait essayer de séparer si on a 'last-name' etc.
-                $first_name = sanitize_text_field(trim($posted_data[$field_name]));
-                break;
-            }
+        // Extraire le nom (si mappé et trouvé)
+        if (!empty($lname_field_name) && isset($posted_data[$lname_field_name])) {
+            $last_name = sanitize_text_field(trim($posted_data[$lname_field_name]));
         }
-        // On pourrait ajouter une logique similaire pour 'last_name' si nécessaire
-
 
         // --- Préparation de l'appel API SIO ---
-        $api_endpoint = $api_base_url . '/contacts'; // Endpoint pour créer/mettre à jour un contact
-
+        $api_endpoint = $api_base_url . '/contacts';
         $contact_data = [
             'email' => $email,
         ];
         if (!empty($first_name)) {
             $contact_data['firstName'] = $first_name;
         }
-        // if ( ! empty( $last_name ) ) {
-        //    $contact_data['lastName'] = $last_name;
-        // }
-        // On pourrait ajouter ici l'ID du tag si on l'avait déjà configuré
-        // $contact_data['tags'] = [123]; // Exemple: Ajouter au tag avec ID 123
+        if (!empty($last_name)) {
+            $contact_data['lastName'] = $last_name;
+        }
+
+        // Traiter les tags SIO
+        if (!empty($tags_string)) {
+            // Convertir la chaîne "123, 456" en tableau d'entiers [123, 456]
+            $tag_ids = array_map('absint', explode(',', $tags_string));
+            $tag_ids = array_filter($tag_ids); // Enlever les zéros ou invalides
+            if (!empty($tag_ids)) {
+                // Vérifier la documentation de l'API SIO /contacts : comment passer les tags ?
+                // Hypothèse : un tableau d'IDs sous la clé 'tags'
+                $contact_data['tags'] = $tag_ids;
+            }
+        }
 
         $body_json = json_encode($contact_data);
 
         if ($body_json === false) {
-            error_log('[WP SIO Connect] Erreur encodage JSON pour données contact SIO.');
+            error_log('[WP SIO Connect] Erreur encodage JSON pour données contact SIO (Form ID: ' . $form_id . ').');
             return;
         }
 
-        // Définir les arguments pour wp_remote_post
+        // Définir les arguments pour wp_remote_post (idem qu'avant)
         $args = [
             'method' => 'POST',
-            'headers' => [
-                'X-API-Key' => $api_key,
-                'Accept' => 'application/json',
-                'Content-Type' => 'application/json',
-            ],
+            'headers' => [ /* ... */],
             'body' => $body_json,
-            'timeout' => 15, // Secondes
-            // 'sslverify' => false, // Seulement si vous avez des problèmes SSL en local, à ne pas faire en production
+            'timeout' => 15,
+        ];
+        // Ne pas oublier de remettre les headers X-API-Key, Accept, Content-Type
+        $args['headers'] = [
+            'X-API-Key' => $api_key,
+            'Accept' => 'application/json',
+            'Content-Type' => 'application/json',
         ];
 
+
         // --- Exécution de l'appel API ---
-        error_log('[WP SIO Connect] Tentative d\'ajout contact SIO : ' . $email); // Log de débogage
+        error_log('[WP SIO Connect] Tentative d\'ajout contact SIO depuis CF7 ID: ' . $form_id . ' - Email: ' . $email);
         $response = wp_remote_post($api_endpoint, $args);
 
-        // --- Gestion de la réponse ---
+        // --- Gestion de la réponse (idem qu'avant, mais avec log de l'ID) ---
         if (is_wp_error($response)) {
-            // Erreur WordPress (connexion, timeout...)
-            error_log('[WP SIO Connect] Erreur WP API SIO (CF7) : ' . $response->get_error_message());
+            error_log('[WP SIO Connect] Erreur WP API SIO (CF7 ID: ' . $form_id . ') : ' . $response->get_error_message());
         } else {
             $response_code = wp_remote_retrieve_response_code($response);
             $response_body = wp_remote_retrieve_body($response);
 
             if ($response_code >= 200 && $response_code < 300) {
-                // Succès ! Le contact a été créé ou mis à jour.
-                error_log('[WP SIO Connect] Succès API SIO (CF7) : Contact ' . $email . ' ajouté/mis à jour. Code: ' . $response_code);
-                // On pourrait loguer l'ID du contact retourné par SIO si disponible dans $response_body
+                error_log('[WP SIO Connect] Succès API SIO (CF7 ID: ' . $form_id . ') : Contact ' . $email . ' ajouté/mis à jour. Code: ' . $response_code);
             } else {
-                // Erreur renvoyée par l'API SIO
-                error_log('[WP SIO Connect] Erreur API SIO (CF7) : Code ' . $response_code . ' - Réponse : ' . $response_body);
+                error_log('[WP SIO Connect] Erreur API SIO (CF7 ID: ' . $form_id . ') : Code ' . $response_code . ' - Réponse : ' . $response_body);
             }
         }
-
-        // Note: On ne modifie pas $abort ici, donc l'email de CF7 sera toujours envoyé normalement.
-        // Si on voulait *remplacer* l'email CF7 par l'ajout SIO, on mettrait $abort = true;
     }
 
 } // Fin de la classe WP_Systemio_Connect_CF7

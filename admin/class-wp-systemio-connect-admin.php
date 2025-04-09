@@ -398,8 +398,8 @@ class WP_Systemio_Connect_Admin
             $email_field = isset($settings['email_field']) ? $settings['email_field'] : 'your-email'; // Suggestion par défaut
             $fname_field = isset($settings['fname_field']) ? $settings['fname_field'] : 'your-name'; // Suggestion par défaut
             $lname_field = isset($settings['lname_field']) ? $settings['lname_field'] : ''; // Optionnel
-            $tags = isset($settings['tags']) ? $settings['tags'] : ''; // IDs de tags SIO, séparés par virgule
-
+            // $tags = isset($settings['tags']) ? $settings['tags'] : ''; // IDs de tags SIO, séparés par virgule
+            $selected_tags = isset($settings['tags']) && is_array($settings['tags']) ? $settings['tags'] : []; // NOUVEAU: attend un tableau d'IDs
             ?>
             <div class="wp-sio-cf7-form-config"
                 style="border: 1px solid #ccd0d4; padding: 15px; margin-bottom: 15px; background: #fff;">
@@ -470,20 +470,52 @@ class WP_Systemio_Connect_Admin
                                 </p>
                             </td>
                         </tr>
+                        <?php /* --- NOUVEAU CHAMP TAGS --- */ ?>
                         <tr class="wp-sio-cf7-conditional-fields" style="<?php echo $enabled ? '' : 'display:none;'; ?>">
                             <th scope="row">
-                                <label for="wp_sio_cf7_<?php echo $form_id; ?>_tags">
-                                    <?php _e('Tags Systeme.io', 'wp-systemio-connect'); ?>
-                                </label>
+                                <?php _e('Tags Systeme.io', 'wp-systemio-connect'); ?>
                             </th>
                             <td>
-                                <input type="text" id="wp_sio_cf7_<?php echo $form_id; ?>_tags"
-                                    name="wp_systemio_connect_options[cf7_integrations][<?php echo $form_id; ?>][tags]"
-                                    value="<?php echo esc_attr($tags); ?>" class="regular-text" placeholder="123, 456">
-                                <p class="description">
-                                    <?php _e('IDs des tags SIO à ajouter au contact, séparés par des virgules (ex: 123, 456). Laisser vide si aucun tag.', 'wp-systemio-connect'); ?>
-                                </p>
-                                <?php // TODO: Ajouter un bouton "Récupérer les tags via API" plus tard ?>
+                                <?php
+                                // Essayer de récupérer les tags depuis notre fonction
+                                $available_tags = self::get_systemio_tags();
+
+                                if (is_wp_error($available_tags)) {
+                                    // Afficher un message d'erreur si la récupération a échoué
+                                    echo '<p class="notice notice-warning" style="margin-left: 0;">';
+                                    echo '<strong>' . __('Erreur de récupération des tags :', 'wp-systemio-connect') . '</strong><br>';
+                                    echo esc_html($available_tags->get_error_message());
+                                    // Ajouter un bouton pour forcer le rafraîchissement ? (plus complexe)
+                                    echo '</p>';
+                                    // Afficher quand même un champ caché pour ne pas effacer la sélection précédente lors de la sauvegarde
+                                    foreach ($selected_tags as $tag_id) {
+                                        echo '<input type="hidden" name="wp_systemio_connect_options[cf7_integrations][' . $form_id . '][tags][]" value="' . esc_attr($tag_id) . '">';
+                                    }
+
+                                } elseif (empty($available_tags)) {
+                                    echo '<p>' . __('Aucun tag trouvé dans votre compte Systeme.io ou l\'API n\'est pas configuréedd.', 'wp-systemio-connect') . '</p>';
+                                } else {
+                                    // Afficher les cases à cocher
+                                    echo '<div class="wp-sio-tags-checkbox-list" style="max-height: 150px; overflow-y: auto; border: 1px solid #ccd0d4; padding: 5px; background: #f9f9f9;">';
+                                    // Champ caché pour s'assurer que 'tags' est envoyé même si rien n'est coché (pour effacer la sélection précédente)
+                                    echo '<input type="hidden" name="wp_systemio_connect_options[cf7_integrations][' . $form_id . '][tags]" value="">';
+
+                                    foreach ($available_tags as $tag_id => $tag_name) {
+                                        $checkbox_id = 'wp_sio_cf7_' . $form_id . '_tag_' . $tag_id;
+                                        $is_checked = in_array((string) $tag_id, $selected_tags); // Comparaison de chaînes pour être sûr
+                                        ?>
+                                        <label for="<?php echo esc_attr($checkbox_id); ?>" style="display: block; margin-bottom: 3px;">
+                                            <input type="checkbox" id="<?php echo esc_attr($checkbox_id); ?>"
+                                                name="wp_systemio_connect_options[cf7_integrations][<?php echo $form_id; ?>][tags][]"
+                                                value="<?php echo esc_attr($tag_id); ?>" <?php checked($is_checked); ?>>
+                                            <?php echo esc_html($tag_name); ?> (ID: <?php echo esc_html($tag_id); ?>)
+                                        </label>
+                                        <?php
+                                    }
+                                    echo '</div>'; // .wp-sio-tags-checkbox-list
+                                    echo '<p class="description">' . __('Cochez les tags à ajouter au contact lors de la soumission.', 'wp-systemio-connect') . '</p>';
+                                }
+                                ?>
                             </td>
                         </tr>
                     </tbody>
@@ -575,14 +607,22 @@ class WP_Systemio_Connect_Admin
                     $sanitized_settings['lname_field'] = isset($settings['lname_field']) ? sanitize_text_field($settings['lname_field']) : '';
 
                     // Nettoyer les tags : enlever espaces, garder chiffres et virgules
+                    // --- NOUVEAU Nettoyage des Tags ---
                     if (isset($settings['tags'])) {
-                        $tags_raw = sanitize_text_field($settings['tags']);
-                        // Enlever tout sauf les chiffres et les virgules, puis nettoyer les virgules multiples ou en début/fin
-                        $tags_cleaned = preg_replace('/[^0-9,]/', '', $tags_raw);
-                        $tags_cleaned = trim(preg_replace('/,+/', ',', $tags_cleaned), ',');
-                        $sanitized_settings['tags'] = $tags_cleaned;
+                        if (is_array($settings['tags'])) {
+                            // Si c'est un tableau (venu des checkboxes)
+                            // Convertir chaque ID en entier positif et filtrer les zéros/invalides
+                            $sanitized_settings['tags'] = array_filter(array_map('absint', $settings['tags']));
+                        } elseif (is_string($settings['tags']) && $settings['tags'] === '') {
+                            // Si c'est la chaîne vide (venue du champ caché quand rien n'est coché)
+                            $sanitized_settings['tags'] = []; // Stocker comme tableau vide
+                        } else {
+                            // Cas improbable ou si on a gardé le champ caché de l'étape précédente
+                            $sanitized_settings['tags'] = [];
+                        }
                     } else {
-                        $sanitized_settings['tags'] = '';
+                        // Si la clé 'tags' n'est pas envoyée du tout (ne devrait pas arriver avec le champ caché)
+                        $sanitized_settings['tags'] = [];
                     }
 
                     // **Validation importante** : S'assurer que le champ email est bien renseigné si activé
@@ -604,8 +644,12 @@ class WP_Systemio_Connect_Admin
                     $sanitized_settings['email_field'] = isset($settings['email_field']) ? sanitize_text_field($settings['email_field']) : '';
                     $sanitized_settings['fname_field'] = isset($settings['fname_field']) ? sanitize_text_field($settings['fname_field']) : '';
                     $sanitized_settings['lname_field'] = isset($settings['lname_field']) ? sanitize_text_field($settings['lname_field']) : '';
-                    $sanitized_settings['tags'] = isset($settings['tags']) ? preg_replace('/[^0-9,]/', '', sanitize_text_field($settings['tags'])) : '';
-                    $sanitized_settings['tags'] = trim(preg_replace('/,+/', ',', $sanitized_settings['tags']), ',');
+                    // Sauvegarder les tags aussi
+                    if (isset($settings['tags']) && is_array($settings['tags'])) {
+                        $sanitized_settings['tags'] = array_filter(array_map('absint', $settings['tags']));
+                    } else {
+                        $sanitized_settings['tags'] = [];
+                    }
                 }
 
 
@@ -615,6 +659,84 @@ class WP_Systemio_Connect_Admin
         }
 
         return $sanitized_options;
+    }
+
+    // Dans la classe WP_Systemio_Connect_Admin (admin/class-wp-systemio-connect-admin.php)
+
+    /**
+     * Récupère les tags depuis l'API Systeme.io avec mise en cache.
+     *
+     * @param bool $force_refresh Forcer le rafraîchissement du cache.
+     * @return array|WP_Error Tableau des tags [id => name] en cas de succès, WP_Error en cas d'échec.
+     */
+    public static function get_systemio_tags($force_refresh = true)
+    {
+        $cache_key = 'wp_sio_connect_tags_cache';
+        $tags = get_transient($cache_key);
+
+        // Si le cache existe et qu'on ne force pas le rafraîchissement, le retourner
+        if (false !== $tags && !$force_refresh) {
+            return $tags;
+        }
+
+        // Sinon, appeler l'API
+        $api_key = self::get_api_key();
+        $api_base_url = self::get_api_base_url();
+
+        if (empty($api_key) || empty($api_base_url)) {
+            return new WP_Error('api_not_configured', __('L\'API Systeme.io n\'est pas configurée.', 'wp-systemio-connect'));
+        }
+
+        $endpoint = $api_base_url . '/tags';
+        // Ajouter des paramètres pour la pagination si nécessaire (ex: ?limit=100)
+        // L'API V2 de SIO utilise la pagination, il faudra peut-être boucler si > 50 tags par défaut
+        // Pour commencer, on prend la première page (souvent suffisant)
+        $endpoint .= '?limit=100'; // Récupérer jusqu'à 100 tags
+
+        $args = [
+            'headers' => [
+                'X-API-Key' => $api_key,
+                'Accept' => 'application/json',
+            ],
+            'timeout' => 15,
+        ];
+
+        $response = wp_remote_get($endpoint, $args);
+
+        if (is_wp_error($response)) {
+            error_log('[WP SIO Connect] Erreur WP lors de la récupération des tags SIO : ' . $response->get_error_message());
+            return $response; // Renvoyer l'erreur WP
+        }
+
+
+
+        $response_code = wp_remote_retrieve_response_code($response);
+        $response_body = wp_remote_retrieve_body($response);
+        $data = json_decode($response_body, true);
+
+        if ($response_code >= 200 && $response_code < 300 && isset($data['items']) && is_array($data['items'])) {
+            $formatted_tags = [];
+            foreach ($data['items'] as $tag) {
+                if (isset($tag['id']) && isset($tag['name'])) {
+                    $formatted_tags[$tag['id']] = $tag['name'];
+                }
+            }
+            // Mettre en cache pour 1 heure (3600 secondes)
+            set_transient($cache_key, $formatted_tags, HOUR_IN_SECONDS);
+            return $formatted_tags;
+
+            // TODO: Gérer la pagination s'il y a plus de tags que la limite retournée ('nextPageUrl' dans la réponse ?)
+
+        } else {
+            $error_message = __('Impossible de récupérer les tags.', 'wp-systemio-connect');
+            if ($data && isset($data['message'])) {
+                $error_message = $data['message'];
+            } elseif (!empty($response_body)) {
+                $error_message .= ' Réponse API : ' . wp_strip_all_tags($response_body);
+            }
+            error_log('[WP SIO Connect] Erreur API SIO lors de la récupération des tags : Code ' . $response_code . ' - ' . $error_message);
+            return new WP_Error('api_error', sprintf(__('Erreur API Systeme.io (Code: %d) : %s', 'wp-systemio-connect'), $response_code, esc_html($error_message)));
+        }
     }
 } // Fin de la classe WP_Systemio_Connect_Admin
 

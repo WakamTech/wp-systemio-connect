@@ -57,7 +57,8 @@ class WP_Systemio_Connect_CF7
         $email_field_name = $form_settings['email_field'];
         $fname_field_name = isset($form_settings['fname_field']) ? $form_settings['fname_field'] : '';
         $lname_field_name = isset($form_settings['lname_field']) ? $form_settings['lname_field'] : '';
-        $tags_string = isset($form_settings['tags']) ? $form_settings['tags'] : '';
+        // Récupérer le tableau de tags
+        $tag_ids = isset($form_settings['tags']) && is_array($form_settings['tags']) ? $form_settings['tags'] : []; // <-- MODIFIÉ
 
         // Récupérer les données soumises
         $posted_data = $submission->get_posted_data();
@@ -97,15 +98,13 @@ class WP_Systemio_Connect_CF7
             $contact_data['lastName'] = $last_name;
         }
 
-        // Traiter les tags SIO
-        if (!empty($tags_string)) {
-            // Convertir la chaîne "123, 456" en tableau d'entiers [123, 456]
-            $tag_ids = array_map('absint', explode(',', $tags_string));
-            $tag_ids = array_filter($tag_ids); // Enlever les zéros ou invalides
-            if (!empty($tag_ids)) {
-                // Vérifier la documentation de l'API SIO /contacts : comment passer les tags ?
-                // Hypothèse : un tableau d'IDs sous la clé 'tags'
-                $contact_data['tags'] = $tag_ids;
+        // Traiter les tags SIO (maintenant directement le tableau d'IDs)
+        if (!empty($tag_ids)) {
+            // On s'assure que ce sont bien des entiers (normalement déjà fait par sanitize)
+            $tag_ids_int = array_map('intval', $tag_ids);
+            $tag_ids_int = array_filter($tag_ids_int); // Re-filtrer juste au cas où
+            if (!empty($tag_ids_int)) {
+                $contact_data['tags'] = $tag_ids_int; // <-- PLUS SIMPLE
             }
         }
 

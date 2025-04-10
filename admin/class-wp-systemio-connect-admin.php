@@ -33,10 +33,11 @@ class WP_Systemio_Connect_Admin
     /**
      * Ajoute le lien "Réglages" sur la page des plugins.
      */
-    public static function add_settings_link( $links ) {
+    public static function add_settings_link($links)
+    {
         // Pointer vers la nouvelle page principale (l'onglet par défaut sera chargé)
-        $settings_link = '<a href="' . admin_url( 'admin.php?page=wp-systemio-connect' ) . '">' . __( 'Réglages', 'wp-systemio-connect' ) . '</a>';
-        array_unshift( $links, $settings_link );
+        $settings_link = '<a href="' . admin_url('admin.php?page=wp-systemio-connect') . '">' . __('Réglages', 'wp-systemio-connect') . '</a>';
+        array_unshift($links, $settings_link);
         return $links;
     }
 
@@ -72,98 +73,93 @@ class WP_Systemio_Connect_Admin
      */
     public static function register_settings()
     {
-        // 1. Enregistrer le groupe d'options principal
+        // --- Groupe et Champs pour l'Onglet Settings ---
         register_setting(
-            'wp_systemio_connect_options_group', // Nom du groupe (utilisé dans settings_fields())
-            'wp_systemio_connect_options',       // Nom de l'option dans la BDD (wp_options table)
-            [__CLASS__, 'sanitize_options']    // Fonction de nettoyage avant sauvegarde (IMPORTANT)
+            'wp_systemio_connect_settings_group', // Nouveau groupe pour Settings
+            'wp_systemio_connect_options',        // On garde le même nom d'option globale pour l'instant
+            [__CLASS__, 'sanitize_options']     // La fonction sanitize devra gérer les différents groupes potentiels
         );
 
-        // 2. Ajouter une section de réglages
         add_settings_section(
-            'wp_systemio_connect_section_api', // ID unique de la section
-            __('Connexion API Systeme.io', 'wp-systemio-connect'), // Titre de la section
-            [__CLASS__, 'render_section_api_description'], // Fonction affichant une description (optionnel)
-            'wp-systemio-connect' // Slug de la page où afficher cette section
+            'wp_systemio_connect_section_api',
+            __('Connexion API Systeme.io', 'wp-systemio-connect'),
+            [__CLASS__, 'render_section_api_description'],
+            'wp_systemio_connect_settings_page' // Nouvelle page "virtuelle" pour ce groupe
         );
 
-        // 3. Ajouter le champ pour la clé API
         add_settings_field(
-            'api_key', // ID unique du champ
-            __('Clé API Systeme.io', 'wp-systemio-connect'), // Label du champ
-            [__CLASS__, 'render_field_api_key'], // Fonction qui affiche le champ (<input>)
-            'wp-systemio-connect', // Slug de la page
-            'wp_systemio_connect_section_api', // ID de la section où placer ce champ
-            ['label_for' => 'wp_systemio_connect_api_key'] // Associe le label au champ pour l'accessibilité
+            'api_key',
+            __('Clé API Systeme.io', 'wp-systemio-connect'),
+            [__CLASS__, 'render_field_api_key'],
+            'wp_systemio_connect_settings_page', // Page "virtuelle"
+            'wp_systemio_connect_section_api',
+            ['label_for' => 'wp_systemio_connect_api_key']
         );
 
-        // 4. Ajouter le champ pour l'URL de base de SIO (utile si ça change un jour)
         add_settings_field(
-            'api_base_url', // ID unique du champ
-            __('URL API Systeme.io', 'wp-systemio-connect'), // Label du champ
-            [__CLASS__, 'render_field_api_base_url'], // Fonction qui affiche le champ (<input>)
-            'wp-systemio-connect', // Slug de la page
-            'wp_systemio_connect_section_api', // ID de la section où placer ce champ
-            ['label_for' => 'wp_systemio_connect_api_base_url'] // Associe le label au champ pour l'accessibilité
+            'api_base_url',
+            __('URL API Systeme.io', 'wp-systemio-connect'),
+            [__CLASS__, 'render_field_api_base_url'],
+            'wp_systemio_connect_settings_page', // Page "virtuelle"
+            'wp_systemio_connect_section_api',
+            ['label_for' => 'wp_systemio_connect_api_base_url']
         );
 
-        // 5. --- NOUVELLE SECTION : Intégration CF7 ---
-        //    On l'affiche seulement si CF7 est actif
+        // --- NOUVEAU : Groupe et Champs pour l'Onglet Formulaires ---
+        register_setting(
+            'wp_systemio_connect_forms_group', // Nouveau groupe dédié aux formulaires
+            'wp_systemio_connect_options',     // Toujours la même option globale
+            [__CLASS__, 'sanitize_options']  // La même fonction sanitize gérera tout
+        );
+
+        // --- Section et Champ pour CF7 ---
         if (defined('WPCF7_VERSION')) {
             add_settings_section(
-                'wp_systemio_connect_section_cf7', // ID unique
-                __('Intégration Contact Form 7', 'wp-systemio-connect'), // Titre
-                [__CLASS__, 'render_section_cf7_description'], // Callback pour description
-                'wp-systemio-connect' // Page où afficher
+                'wp_systemio_connect_section_cf7',
+                __('Intégration Contact Form 7', 'wp-systemio-connect'),
+                [__CLASS__, 'render_section_cf7_description'],
+                'wp_systemio_connect_forms_page' // Nouvelle page "virtuelle" pour ce groupe
             );
-
-            // 4. --- NOUVEAU CHAMP : Réglages par formulaire CF7 ---
-            //    Ce champ unique va afficher les réglages pour TOUS les formulaires CF7
             add_settings_field(
-                'cf7_form_settings', // ID unique du champ (logique)
-                __('Configuration des Formulaires', 'wp-systemio-connect'), // Label principal
-                [__CLASS__, 'render_field_cf7_form_settings'], // Callback qui affichera la liste
-                'wp-systemio-connect', // Page où afficher
-                'wp_systemio_connect_section_cf7' // Section où afficher
+                'cf7_form_settings',
+                __('Configuration des Formulaires CF7', 'wp-systemio-connect'),
+                [__CLASS__, 'render_field_cf7_form_settings'],
+                'wp_systemio_connect_forms_page', // Page "virtuelle"
+                'wp_systemio_connect_section_cf7'
             );
         }
 
-        // --- NOUVELLE SECTION : Intégration Elementor Pro ---
-        //    On l'affiche seulement si Elementor Pro est actif
+        // --- Section et Champ pour Elementor ---
         if (class_exists('\ElementorPro\Modules\Forms\Classes\Form_Record')) {
             add_settings_section(
-                'wp_systemio_connect_section_elementor', // ID unique
-                __('Intégration Elementor Pro Forms', 'wp-systemio-connect'), // Titre
-                [__CLASS__, 'render_section_elementor_description'], // Callback description
-                'wp-systemio-connect' // Page
+                'wp_systemio_connect_section_elementor',
+                __('Intégration Elementor Pro Forms', 'wp-systemio-connect'),
+                [__CLASS__, 'render_section_elementor_description'],
+                'wp_systemio_connect_forms_page' // Page "virtuelle"
             );
-
-            // --- NOUVEAU CHAMP : Réglages des formulaires Elementor ---
             add_settings_field(
-                'elementor_form_settings', // ID logique
-                __('Configuration des Formulaires', 'wp-systemio-connect'), // Label
-                [__CLASS__, 'render_field_elementor_form_settings'], // Callback
-                'wp-systemio-connect', // Page
-                'wp_systemio_connect_section_elementor' // Section
+                'elementor_form_settings',
+                __('Configuration des Formulaires Elementor', 'wp-systemio-connect'),
+                [__CLASS__, 'render_field_elementor_form_settings'],
+                'wp_systemio_connect_forms_page', // Page "virtuelle"
+                'wp_systemio_connect_section_elementor'
             );
         }
 
-        // --- NOUVELLE SECTION : Intégration Divi ---
-        if (function_exists('et_builder_add_main_elements') || defined('ET_BUILDER_THEME')) { // Autre test pour Divi
+        // --- Section et Champ pour Divi ---
+        if (function_exists('et_builder_add_main_elements') || defined('ET_BUILDER_THEME')) {
             add_settings_section(
-                'wp_systemio_connect_section_divi', // ID unique
-                __('Intégration Divi (Formulaire de Contact)', 'wp-systemio-connect'), // Titre
-                [__CLASS__, 'render_section_divi_description'], // Callback description
-                'wp-systemio-connect' // Page
+                'wp_systemio_connect_section_divi',
+                __('Intégration Divi (Formulaire de Contact)', 'wp-systemio-connect'),
+                [__CLASS__, 'render_section_divi_description'],
+                'wp_systemio_connect_forms_page' // Page "virtuelle"
             );
-
-            // --- NOUVEAU CHAMP : Réglages des formulaires Divi ---
             add_settings_field(
-                'divi_form_settings', // ID logique
-                __('Configuration des Formulaires', 'wp-systemio-connect'), // Label
-                [__CLASS__, 'render_field_divi_form_settings'], // Callback
-                'wp-systemio-connect', // Page
-                'wp_systemio_connect_section_divi' // Section
+                'divi_form_settings',
+                __('Configuration des Formulaires Divi', 'wp-systemio-connect'),
+                [__CLASS__, 'render_field_divi_form_settings'],
+                'wp_systemio_connect_forms_page', // Page "virtuelle"
+                'wp_systemio_connect_section_divi'
             );
         }
     }
@@ -182,6 +178,43 @@ class WP_Systemio_Connect_Admin
         <div class="wrap">
             <h1><?php esc_html_e('WP Systeme.io Connect', 'wp-systemio-connect'); ?></h1>
 
+            <?php
+            // --- AFFICHAGE DES ERREURS/SUCCÈS DU TRANSIENT (Test Connexion) ---
+            $transient_errors = get_transient('settings_errors');
+            if (!empty($transient_errors)) {
+                echo '<div id="setting-error-settings_updated" class="notice notice-alt inline">'; // Utiliser des classes WP pour le style
+                foreach ($transient_errors as $error) {
+                    // Déterminer la classe CSS en fonction du type d'erreur
+                    $css_class = 'notice-info'; // Défaut
+                    if (isset($error['type'])) {
+                        switch ($error['type']) {
+                            case 'error':
+                                $css_class = 'notice-error';
+                                break;
+                            case 'success':
+                                $css_class = 'notice-success';
+                                break;
+                            case 'warning':
+                                $css_class = 'notice-warning';
+                                break;
+                        }
+                    }
+                    // Afficher le message
+                    if (isset($error['message'])) {
+                        echo '<div class="notice ' . esc_attr($css_class) . ' is-dismissible"><p><strong>' . wp_kses_post($error['message']) . '</strong></p></div>';
+                    }
+                }
+                echo '</div>';
+                // Supprimer le transient pour qu'il ne s'affiche qu'une fois
+                delete_transient('settings_errors');
+            }
+            // --- FIN AFFICHAGE TRANSIENT ---
+    
+            // Afficher aussi les erreurs standard de l'API Settings (après sauvegarde via options.php)
+            // On doit choisir un slug. Celui de l'option principale est souvent utilisé.
+            settings_errors('wp_systemio_connect_options'); // Affichera les erreurs ajoutées dans sanitize_options
+            // Ou, si on veut séparer par groupe : settings_errors('wp_systemio_connect_settings_group'); mais add_settings_error doit utiliser ce slug aussi.
+            ?>
             <nav class="nav-tab-wrapper wp-clearfix"
                 aria-label="<?php esc_attr_e('Onglets secondaires', 'wp-systemio-connect'); ?>">
                 <a href="?page=wp-systemio-connect&tab=forms"
@@ -231,9 +264,36 @@ class WP_Systemio_Connect_Admin
     // Créer des méthodes vides (ou avec placeholder) pour chaque onglet pour l'instant
     public static function render_forms_tab()
     {
-        echo '<h2>' . esc_html__('Configuration des Formulaires', 'wp-systemio-connect') . '</h2>';
-        echo '<p>' . esc_html__('Le contenu de la configuration des formulaires (CF7, Elementor, Divi) ira ici.', 'wp-systemio-connect') . '</p>';
-        // On déplacera la logique de rendu et de sauvegarde ici plus tard
+        echo '<h2>' . esc_html__('Configuration des Intégrations de Formulaires', 'wp-systemio-connect') . '</h2>';
+        echo '<p>' . esc_html__('Activez et configurez les formulaires que vous souhaitez connecter à Systeme.io.', 'wp-systemio-connect') . '</p>';
+
+        // Vérifier si l'API est configurée avant d'afficher les options de formulaire? Optionnel mais peut être utile.
+        if (!self::get_api_key()) {
+            echo '<div class="notice notice-warning inline"><p>';
+            printf(
+                __('Veuillez d\'abord <a href="%s">configurer votre clé API Systeme.io</a> dans l\'onglet Réglages API pour activer ces options.', 'wp-systemio-connect'),
+                esc_url(admin_url('admin.php?page=wp-systemio-connect&tab=settings'))
+            );
+            echo '</p></div>';
+            // On pourrait return ici pour ne rien afficher d'autre, ou juste griser les options.
+            // Pour l'instant, on affiche quand même pour voir la structure.
+        }
+
+        ?>
+        <form action="options.php" method="post">
+            <?php
+            // Sécurité et champs cachés pour ce groupe spécifique
+            settings_fields('wp_systemio_connect_forms_group'); // Utiliser le groupe des formulaires
+    
+            // Afficher les sections et champs enregistrés pour 'wp_systemio_connect_forms_page'
+            // L'API Settings affichera les sections CF7, Elementor, Divi si les conditions (if defined/class_exists) sont remplies
+            do_settings_sections('wp_systemio_connect_forms_page');
+
+            // Bouton de sauvegarde pour cet onglet
+            submit_button(__('Enregistrer les Réglages des Formulaires', 'wp-systemio-connect'));
+            ?>
+        </form>
+        <?php
     }
 
     public static function render_contacts_tab()
@@ -252,9 +312,31 @@ class WP_Systemio_Connect_Admin
 
     public static function render_settings_tab()
     {
-        echo '<h2>' . esc_html__('Réglages de Connexion API Systeme.io', 'wp-systemio-connect') . '</h2>';
-        echo '<p>' . esc_html__('Les champs Clé API, URL API et le bouton Test iront ici.', 'wp-systemio-connect') . '</p>';
-        // On déplacera la logique de rendu et de sauvegarde ici plus tard
+        ?>
+        <form action="options.php" method="post">
+            <?php
+            // Sécurité et champs cachés pour ce groupe spécifique
+            settings_fields('wp_systemio_connect_settings_group'); // Utiliser le nom du groupe défini dans register_setting
+    
+            // Afficher les sections et champs enregistrés pour 'wp_systemio_connect_settings_page'
+            do_settings_sections('wp_systemio_connect_settings_page');
+
+            // Bouton de sauvegarde pour cet onglet
+            submit_button(__('Enregistrer les Réglages API', 'wp-systemio-connect'));
+            ?>
+        </form>
+
+        <?php // Section pour le bouton de test (reste comme avant) ?>
+        <hr>
+        <h2><?php _e('Tester la Connexion API', 'wp-systemio-connect'); ?></h2>
+        <p><?php _e('Cliquez sur le bouton ci-dessous pour vérifier si la clé API enregistrée fonctionne.', 'wp-systemio-connect'); ?>
+        </p>
+        <form method="post" action="<?php echo esc_url(admin_url('admin-post.php')); ?>">
+            <input type="hidden" name="action" value="wp_systemio_connect_test_connection">
+            <?php wp_nonce_field('wp_systemio_connect_test_connection_nonce', 'wp_systemio_connect_nonce'); ?>
+            <?php submit_button(__('Tester la Connexion', 'wp-systemio-connect'), 'secondary', 'submit_test_connection', false); ?>
+        </form>
+        <?php
     }
 
     /**
@@ -455,7 +537,7 @@ class WP_Systemio_Connect_Admin
         set_transient('settings_errors', get_settings_errors(), 30); // Stocke les erreurs temporairement
 
         // 7. Rediriger vers la page de réglages
-        $redirect_url = admin_url('options-general.php?page=wp-systemio-connect');
+        $redirect_url = admin_url('admin.php?page=wp-systemio-connect&tab=settings');
         wp_redirect(add_query_arg('settings-updated', 'false', $redirect_url)); // 'false' pour ne pas afficher "Réglages enregistrés."
         exit;
     }
@@ -713,214 +795,252 @@ class WP_Systemio_Connect_Admin
      */
     public static function sanitize_options($input)
     {
-        // $input contient toutes les données soumises par le formulaire de réglages
-        $sanitized_options = [];
+        // Récupérer TOUTES les options existantes
+        $existing_options = get_option('wp_systemio_connect_options', []); // [] comme valeur par défaut si l'option n'existe pas encore
 
-        // --- Nettoyage des options API (comme avant) ---
-        if (isset($input['api_key'])) {
-            $sanitized_options['api_key'] = trim(wp_kses($input['api_key'], []));
-        }
-        if (isset($input['api_base_url'])) {
-            $url = esc_url_raw(trim($input['api_base_url']));
-            if (empty($url) || filter_var($url, FILTER_VALIDATE_URL) === false) {
-                $sanitized_options['api_base_url'] = 'https://api.systeme.io/api';
+        // Initialiser le tableau des nouvelles options nettoyées (basé sur les existantes)
+        $sanitized_options = $existing_options;
+
+        // Identifier quel groupe a soumis le formulaire (un peu complexe sans info directe)
+        // Astuce: Vérifier quels champs sont présents dans $input. Si 'api_key' est là, c'est probablement le groupe Settings.
+        // ATTENTION: Cette méthode peut être fragile si les noms de champs ne sont pas uniques entre les groupes.
+
+        $is_settings_submission = isset($input['api_key']) || isset($input['api_base_url']);
+        $is_forms_submission = isset($input['cf7_integrations']) || isset($input['elementor_integrations']) || isset($input['divi_integrations']); // A adapter quand on fera le groupe Formulaires
+
+        if ($is_settings_submission) {
+            error_log('[WP SIO Sanitize Debug] Processing SETTINGS submission.');
+            // --- Nettoyage des options API ---
+            if (isset($input['api_key'])) {
+                $sanitized_options['api_key'] = trim(wp_kses($input['api_key'], []));
             } else {
-                $sanitized_options['api_base_url'] = $url;
+                // Si on soumet depuis Settings et que la clé est absente, la vider (important)
+                $sanitized_options['api_key'] = '';
             }
-        }
 
-        // --- NOUVEAU: Nettoyage des options d'intégration CF7 ---
-        if (isset($input['cf7_integrations']) && is_array($input['cf7_integrations'])) {
-            $sanitized_cf7 = [];
-            foreach ($input['cf7_integrations'] as $form_id => $settings) {
-                // S'assurer que form_id est un entier positif
-                $form_id = absint($form_id);
-                if ($form_id <= 0 || !is_array($settings)) {
-                    continue; // Ignorer les entrées invalides
+            if (isset($input['api_base_url'])) {
+                $url = esc_url_raw(trim($input['api_base_url']));
+                if (empty($url) || filter_var($url, FILTER_VALIDATE_URL) === false) {
+                    $sanitized_options['api_base_url'] = 'https://api.systeme.io/api';
+                } else {
+                    $sanitized_options['api_base_url'] = $url;
                 }
+            } else {
+                // Si on soumet depuis Settings et que l'URL est absente, remettre la valeur par défaut (ou vider?)
+                $sanitized_options['api_base_url'] = 'https://api.systeme.io/api';
+            }
+        } elseif ($is_forms_submission) {
+            error_log('[WP SIO Sanitize Debug] Processing FORMS submission.');
+            // Nettoyer et mettre à jour SEULEMENT les clés des formulaires
 
-                $sanitized_settings = [];
-                // Nettoyer chaque champ de réglage pour ce formulaire
-                $sanitized_settings['enabled'] = isset($settings['enabled']) ? (bool) $settings['enabled'] : false;
+            // --- CF7 ---
+            if (isset($input['cf7_integrations']) && is_array($input['cf7_integrations'])) {
+                $sanitized_cf7 = [];
+                foreach ($input['cf7_integrations'] as $form_id => $settings) {
+                    // S'assurer que form_id est un entier positif
+                    $form_id = absint($form_id);
+                    if ($form_id <= 0 || !is_array($settings)) {
+                        continue; // Ignorer les entrées invalides
+                    }
 
-                // Si le formulaire n'est pas activé, on peut ignorer les autres champs ou les garder vides
-                if ($sanitized_settings['enabled']) {
+                    $sanitized_settings = [];
+                    // Nettoyer chaque champ de réglage pour ce formulaire
+                    $sanitized_settings['enabled'] = isset($settings['enabled']) ? (bool) $settings['enabled'] : false;
+
+                    // Si le formulaire n'est pas activé, on peut ignorer les autres champs ou les garder vides
+                    if ($sanitized_settings['enabled']) {
+                        $sanitized_settings['email_field'] = isset($settings['email_field']) ? sanitize_text_field($settings['email_field']) : '';
+                        $sanitized_settings['fname_field'] = isset($settings['fname_field']) ? sanitize_text_field($settings['fname_field']) : '';
+                        $sanitized_settings['lname_field'] = isset($settings['lname_field']) ? sanitize_text_field($settings['lname_field']) : '';
+
+                        // Nettoyer les tags : enlever espaces, garder chiffres et virgules
+                        // --- NOUVEAU Nettoyage des Tags ---
+                        if (isset($settings['tags'])) {
+                            if (is_array($settings['tags'])) {
+                                // Si c'est un tableau (venu des checkboxes)
+                                // Convertir chaque ID en entier positif et filtrer les zéros/invalides
+                                $sanitized_settings['tags'] = array_filter(array_map('absint', $settings['tags']));
+                            } elseif (is_string($settings['tags']) && $settings['tags'] === '') {
+                                // Si c'est la chaîne vide (venue du champ caché quand rien n'est coché)
+                                $sanitized_settings['tags'] = []; // Stocker comme tableau vide
+                            } else {
+                                // Cas improbable ou si on a gardé le champ caché de l'étape précédente
+                                $sanitized_settings['tags'] = [];
+                            }
+                        } else {
+                            // Si la clé 'tags' n'est pas envoyée du tout (ne devrait pas arriver avec le champ caché)
+                            $sanitized_settings['tags'] = [];
+                        }
+
+                        // **Validation importante** : S'assurer que le champ email est bien renseigné si activé
+                        if (empty($sanitized_settings['email_field'])) {
+                            // Peut-être désactiver automatiquement ou afficher une erreur ?
+                            // Pour l'instant, on le laisse mais ce n'est pas idéal.
+                            add_settings_error(
+                                'wp_systemio_connect_options',
+                                'cf7_email_missing_' . $form_id,
+                                sprintf(__('Attention : Le champ Email est obligatoire pour le formulaire CF7 ID %d lorsqu\'il est activé pour Systeme.io.', 'wp-systemio-connect'), $form_id),
+                                'warning' // Ou 'error' si on veut être plus strict
+                            );
+                            // On pourrait forcer enabled à false ici:
+                            // $sanitized_settings['enabled'] = false;
+                        }
+
+                    } else {
+                        // Si désactivé, on sauvegarde quand même les champs vides pour ne pas perdre la config
+                        $sanitized_settings['email_field'] = isset($settings['email_field']) ? sanitize_text_field($settings['email_field']) : '';
+                        $sanitized_settings['fname_field'] = isset($settings['fname_field']) ? sanitize_text_field($settings['fname_field']) : '';
+                        $sanitized_settings['lname_field'] = isset($settings['lname_field']) ? sanitize_text_field($settings['lname_field']) : '';
+                        // Sauvegarder les tags aussi
+                        if (isset($settings['tags']) && is_array($settings['tags'])) {
+                            $sanitized_settings['tags'] = array_filter(array_map('absint', $settings['tags']));
+                        } else {
+                            $sanitized_settings['tags'] = [];
+                        }
+                    }
+
+
+                    $sanitized_cf7[$form_id] = $sanitized_settings;
+                }
+                $sanitized_options['cf7_integrations'] = $sanitized_cf7;
+            } elseif (array_key_exists('cf7_integrations', $input)) {
+                // Si la clé existe mais est vide (ex: si on a supprimé la dernière config CF7 via JS)
+                $sanitized_options['cf7_integrations'] = [];
+            }
+            // Si la clé n'est pas dans $input, on ne touche pas à $sanitized_options['cf7_integrations']
+
+            // --- Elementor ---
+            if (isset($input['elementor_integrations']) && is_array($input['elementor_integrations'])) {
+                error_log('[WP SIO Connect Admin] Options being saved: '); // Log avant de retourner
+
+                $sanitized_elementor = [];
+                foreach ($input['elementor_integrations'] as $index_or_id => $settings) {
+                    // Récupérer le vrai ID du formulaire depuis le champ dédié
+                    $form_id = isset($settings['form_id']) ? sanitize_text_field(trim($settings['form_id'])) : '';
+
+                    // Si l'ID est vide ou si ce n'est pas un tableau de settings valide, on ignore cette ligne
+                    if (empty($form_id) || !is_array($settings)) {
+                        continue;
+                    }
+
+                    // Utiliser $form_id comme clé pour le tableau final
+                    $sanitized_settings = [];
+                    $sanitized_settings['enabled'] = isset($settings['enabled']) ? (bool) $settings['enabled'] : false;
+
+                    // Nettoyer les champs de mapping et tags (similaire à CF7)
                     $sanitized_settings['email_field'] = isset($settings['email_field']) ? sanitize_text_field($settings['email_field']) : '';
                     $sanitized_settings['fname_field'] = isset($settings['fname_field']) ? sanitize_text_field($settings['fname_field']) : '';
                     $sanitized_settings['lname_field'] = isset($settings['lname_field']) ? sanitize_text_field($settings['lname_field']) : '';
 
-                    // Nettoyer les tags : enlever espaces, garder chiffres et virgules
-                    // --- NOUVEAU Nettoyage des Tags ---
                     if (isset($settings['tags'])) {
                         if (is_array($settings['tags'])) {
-                            // Si c'est un tableau (venu des checkboxes)
-                            // Convertir chaque ID en entier positif et filtrer les zéros/invalides
                             $sanitized_settings['tags'] = array_filter(array_map('absint', $settings['tags']));
                         } elseif (is_string($settings['tags']) && $settings['tags'] === '') {
-                            // Si c'est la chaîne vide (venue du champ caché quand rien n'est coché)
-                            $sanitized_settings['tags'] = []; // Stocker comme tableau vide
+                            $sanitized_settings['tags'] = [];
                         } else {
-                            // Cas improbable ou si on a gardé le champ caché de l'étape précédente
+                            $sanitized_settings['tags'] = []; // Fallback
+                        }
+                    } else {
+                        $sanitized_settings['tags'] = [];
+                    }
+
+
+                    // Validation cruciale : ID Formulaire et Champ Email doivent être définis si activé
+                    if ($sanitized_settings['enabled']) {
+                        if (empty($sanitized_settings['email_field'])) {
+                            add_settings_error(
+                                'wp_systemio_connect_options',
+                                'elementor_email_missing_' . $form_id,
+                                sprintf(__('Attention : L\'ID du Champ Email est obligatoire pour le formulaire Elementor "%s" lorsqu\'il est activé.', 'wp-systemio-connect'), esc_html($form_id)),
+                                'warning'
+                            );
+                            // On pourrait désactiver ici pour forcer la correction :
+                            // $sanitized_settings['enabled'] = false;
+                        }
+                    }
+                    // Même si désactivé, on stocke la config pour ne pas la perdre
+                    $sanitized_elementor[$form_id] = $sanitized_settings; // Utiliser le vrai form_id comme clé
+                }
+                $sanitized_options['elementor_integrations'] = $sanitized_elementor;
+            } elseif (array_key_exists('elementor_integrations', $input)) {
+                $sanitized_options['elementor_integrations'] = [];
+            }
+            // Si non soumis, on ne touche pas
+
+            // --- Divi ---
+            if (isset($input['divi_integrations']) && is_array($input['divi_integrations'])) {
+                $sanitized_divi = [];
+                foreach ($input['divi_integrations'] as $index => $settings) {
+                    $css_id = isset($settings['css_id']) ? sanitize_html_class(trim($settings['css_id'])) : ''; // sanitize_html_class est bien pour les ID/classes CSS
+
+                    if (empty($css_id) || !is_array($settings)) {
+                        continue;
+                    }
+
+                    $sanitized_settings = [];
+                    $sanitized_settings['enabled'] = isset($settings['enabled']) ? (bool) $settings['enabled'] : false;
+
+                    // Nettoyer mapping champs (ID des champs Divi)
+                    $sanitized_settings['email_field'] = isset($settings['email_field']) ? sanitize_text_field($settings['email_field']) : '';
+                    $sanitized_settings['fname_field'] = isset($settings['fname_field']) ? sanitize_text_field($settings['fname_field']) : '';
+                    $sanitized_settings['lname_field'] = isset($settings['lname_field']) ? sanitize_text_field($settings['lname_field']) : '';
+
+                    // --- Nettoyage des Tags ---
+                    if (isset($settings['tags'])) {
+                        if (is_array($settings['tags'])) {
+                            // Cas normal : vient des checkboxes cochées (ou d'une sauvegarde précédente)
+                            // Convertir chaque ID en entier positif et filtrer les zéros/invalides
+                            $sanitized_settings['tags'] = array_filter(array_map('absint', $settings['tags']));
+                            // Optionnel : Ré-indexer le tableau pour avoir des clés numériques séquentielles (0, 1, 2...)
+                            // $sanitized_settings['tags'] = array_values($sanitized_settings['tags']);
+                        } elseif (is_string($settings['tags']) && $settings['tags'] === '') {
+                            // Cas où aucune case n'est cochée, le champ caché envoie une chaîne vide
+                            $sanitized_settings['tags'] = []; // Stocker comme tableau vide
+                        } elseif (is_string($settings['tags']) && !empty($settings['tags'])) {
+                            // Cas où les données pourraient provenir d'un champ caché contenant des IDs lors d'une erreur de récupération API
+                            // On essaie de parser la chaîne comme si elle contenait des IDs séparés par des virgules
+                            $tags_raw = sanitize_text_field($settings['tags']);
+                            $tags_cleaned = preg_replace('/[^0-9,]/', '', $tags_raw);
+                            $tags_cleaned = trim(preg_replace('/,+/', ',', $tags_cleaned), ',');
+                            if (!empty($tags_cleaned)) {
+                                $tag_ids = array_map('absint', explode(',', $tags_cleaned));
+                                $sanitized_settings['tags'] = array_filter($tag_ids);
+                                // $sanitized_settings['tags'] = array_values($sanitized_settings['tags']); // Optionnel
+                            } else {
+                                $sanitized_settings['tags'] = [];
+                            }
+                        } else {
+                            // Cas par défaut ou inattendu (ni tableau, ni chaîne vide, ni chaîne d'IDs)
                             $sanitized_settings['tags'] = [];
                         }
                     } else {
                         // Si la clé 'tags' n'est pas envoyée du tout (ne devrait pas arriver avec le champ caché)
                         $sanitized_settings['tags'] = [];
                     }
+                    // À ce stade, $sanitized_settings['tags'] devrait toujours être un tableau (potentiellement vide).
 
-                    // **Validation importante** : S'assurer que le champ email est bien renseigné si activé
-                    if (empty($sanitized_settings['email_field'])) {
-                        // Peut-être désactiver automatiquement ou afficher une erreur ?
-                        // Pour l'instant, on le laisse mais ce n'est pas idéal.
-                        add_settings_error(
-                            'wp_systemio_connect_options',
-                            'cf7_email_missing_' . $form_id,
-                            sprintf(__('Attention : Le champ Email est obligatoire pour le formulaire CF7 ID %d lorsqu\'il est activé pour Systeme.io.', 'wp-systemio-connect'), $form_id),
-                            'warning' // Ou 'error' si on veut être plus strict
-                        );
-                        // On pourrait forcer enabled à false ici:
-                        // $sanitized_settings['enabled'] = false;
+                    // Validation si activé (comme avant)
+                    if ($sanitized_settings['enabled'] && empty($sanitized_settings['email_field'])) {
+                        add_settings_error( /* ... */);
                     }
 
-                } else {
-                    // Si désactivé, on sauvegarde quand même les champs vides pour ne pas perdre la config
-                    $sanitized_settings['email_field'] = isset($settings['email_field']) ? sanitize_text_field($settings['email_field']) : '';
-                    $sanitized_settings['fname_field'] = isset($settings['fname_field']) ? sanitize_text_field($settings['fname_field']) : '';
-                    $sanitized_settings['lname_field'] = isset($settings['lname_field']) ? sanitize_text_field($settings['lname_field']) : '';
-                    // Sauvegarder les tags aussi
-                    if (isset($settings['tags']) && is_array($settings['tags'])) {
-                        $sanitized_settings['tags'] = array_filter(array_map('absint', $settings['tags']));
-                    } else {
-                        $sanitized_settings['tags'] = [];
-                    }
+                    $sanitized_divi[$css_id] = $sanitized_settings; // Utiliser l'ID CSS comme clé
                 }
-
-
-                $sanitized_cf7[$form_id] = $sanitized_settings;
+                $sanitized_options['divi_integrations'] = $sanitized_divi;
+            } elseif (array_key_exists('divi_integrations', $input)) {
+                $sanitized_options['divi_integrations'] = [];
             }
-            $sanitized_options['cf7_integrations'] = $sanitized_cf7;
+            // Si non soumis, on ne touche pas
+
+            // Ne pas toucher aux clés 'api_key', 'api_base_url' ici
+
+        } else {
+            // Cas inconnu ou soumission vide ? Ne rien faire ou logguer.
+            error_log('[WP SIO Sanitize Debug] Unknown submission type or empty input.');
         }
 
-        // --- NOUVEAU: Nettoyage des options d'intégration Elementor ---
-        if (isset($input['elementor_integrations']) && is_array($input['elementor_integrations'])) {
-            error_log('[WP SIO Connect Admin] Options being saved: '); // Log avant de retourner
-
-            $sanitized_elementor = [];
-            foreach ($input['elementor_integrations'] as $index_or_id => $settings) {
-                // Récupérer le vrai ID du formulaire depuis le champ dédié
-                $form_id = isset($settings['form_id']) ? sanitize_text_field(trim($settings['form_id'])) : '';
-
-                // Si l'ID est vide ou si ce n'est pas un tableau de settings valide, on ignore cette ligne
-                if (empty($form_id) || !is_array($settings)) {
-                    continue;
-                }
-
-                // Utiliser $form_id comme clé pour le tableau final
-                $sanitized_settings = [];
-                $sanitized_settings['enabled'] = isset($settings['enabled']) ? (bool) $settings['enabled'] : false;
-
-                // Nettoyer les champs de mapping et tags (similaire à CF7)
-                $sanitized_settings['email_field'] = isset($settings['email_field']) ? sanitize_text_field($settings['email_field']) : '';
-                $sanitized_settings['fname_field'] = isset($settings['fname_field']) ? sanitize_text_field($settings['fname_field']) : '';
-                $sanitized_settings['lname_field'] = isset($settings['lname_field']) ? sanitize_text_field($settings['lname_field']) : '';
-
-                if (isset($settings['tags'])) {
-                    if (is_array($settings['tags'])) {
-                        $sanitized_settings['tags'] = array_filter(array_map('absint', $settings['tags']));
-                    } elseif (is_string($settings['tags']) && $settings['tags'] === '') {
-                        $sanitized_settings['tags'] = [];
-                    } else {
-                        $sanitized_settings['tags'] = []; // Fallback
-                    }
-                } else {
-                    $sanitized_settings['tags'] = [];
-                }
-
-
-                // Validation cruciale : ID Formulaire et Champ Email doivent être définis si activé
-                if ($sanitized_settings['enabled']) {
-                    if (empty($sanitized_settings['email_field'])) {
-                        add_settings_error(
-                            'wp_systemio_connect_options',
-                            'elementor_email_missing_' . $form_id,
-                            sprintf(__('Attention : L\'ID du Champ Email est obligatoire pour le formulaire Elementor "%s" lorsqu\'il est activé.', 'wp-systemio-connect'), esc_html($form_id)),
-                            'warning'
-                        );
-                        // On pourrait désactiver ici pour forcer la correction :
-                        // $sanitized_settings['enabled'] = false;
-                    }
-                }
-                // Même si désactivé, on stocke la config pour ne pas la perdre
-                $sanitized_elementor[$form_id] = $sanitized_settings; // Utiliser le vrai form_id comme clé
-            }
-            $sanitized_options['elementor_integrations'] = $sanitized_elementor;
-        }
-
-
-        // --- NOUVEAU: Nettoyage Intégration Divi ---
-        if (isset($input['divi_integrations']) && is_array($input['divi_integrations'])) {
-            $sanitized_divi = [];
-            foreach ($input['divi_integrations'] as $index => $settings) {
-                $css_id = isset($settings['css_id']) ? sanitize_html_class(trim($settings['css_id'])) : ''; // sanitize_html_class est bien pour les ID/classes CSS
-
-                if (empty($css_id) || !is_array($settings)) {
-                    continue;
-                }
-
-                $sanitized_settings = [];
-                $sanitized_settings['enabled'] = isset($settings['enabled']) ? (bool) $settings['enabled'] : false;
-
-                // Nettoyer mapping champs (ID des champs Divi)
-                $sanitized_settings['email_field'] = isset($settings['email_field']) ? sanitize_text_field($settings['email_field']) : '';
-                $sanitized_settings['fname_field'] = isset($settings['fname_field']) ? sanitize_text_field($settings['fname_field']) : '';
-                $sanitized_settings['lname_field'] = isset($settings['lname_field']) ? sanitize_text_field($settings['lname_field']) : '';
-
-                // --- Nettoyage des Tags ---
-                if (isset($settings['tags'])) {
-                    if (is_array($settings['tags'])) {
-                        // Cas normal : vient des checkboxes cochées (ou d'une sauvegarde précédente)
-                        // Convertir chaque ID en entier positif et filtrer les zéros/invalides
-                        $sanitized_settings['tags'] = array_filter(array_map('absint', $settings['tags']));
-                        // Optionnel : Ré-indexer le tableau pour avoir des clés numériques séquentielles (0, 1, 2...)
-                        // $sanitized_settings['tags'] = array_values($sanitized_settings['tags']);
-                    } elseif (is_string($settings['tags']) && $settings['tags'] === '') {
-                        // Cas où aucune case n'est cochée, le champ caché envoie une chaîne vide
-                        $sanitized_settings['tags'] = []; // Stocker comme tableau vide
-                    } elseif (is_string($settings['tags']) && !empty($settings['tags'])) {
-                        // Cas où les données pourraient provenir d'un champ caché contenant des IDs lors d'une erreur de récupération API
-                        // On essaie de parser la chaîne comme si elle contenait des IDs séparés par des virgules
-                        $tags_raw = sanitize_text_field($settings['tags']);
-                        $tags_cleaned = preg_replace('/[^0-9,]/', '', $tags_raw);
-                        $tags_cleaned = trim(preg_replace('/,+/', ',', $tags_cleaned), ',');
-                        if (!empty($tags_cleaned)) {
-                            $tag_ids = array_map('absint', explode(',', $tags_cleaned));
-                            $sanitized_settings['tags'] = array_filter($tag_ids);
-                            // $sanitized_settings['tags'] = array_values($sanitized_settings['tags']); // Optionnel
-                        } else {
-                            $sanitized_settings['tags'] = [];
-                        }
-                    } else {
-                        // Cas par défaut ou inattendu (ni tableau, ni chaîne vide, ni chaîne d'IDs)
-                        $sanitized_settings['tags'] = [];
-                    }
-                } else {
-                    // Si la clé 'tags' n'est pas envoyée du tout (ne devrait pas arriver avec le champ caché)
-                    $sanitized_settings['tags'] = [];
-                }
-                // À ce stade, $sanitized_settings['tags'] devrait toujours être un tableau (potentiellement vide).
-
-                // Validation si activé (comme avant)
-                if ($sanitized_settings['enabled'] && empty($sanitized_settings['email_field'])) {
-                    add_settings_error( /* ... */);
-                }
-
-                $sanitized_divi[$css_id] = $sanitized_settings; // Utiliser l'ID CSS comme clé
-            }
-            $sanitized_options['divi_integrations'] = $sanitized_divi;
-        }
-
-
-        return $sanitized_options;
+        error_log('[WP SIO Sanitize Debug] FINAL Options structure after specific update: ' . print_r($sanitized_options, true));
+        return $sanitized_options; // Retourner le tableau fusionné et nettoyé
     }
 
     // Dans la classe WP_Systemio_Connect_Admin (admin/class-wp-systemio-connect-admin.php)

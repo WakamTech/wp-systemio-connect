@@ -33,10 +33,10 @@ class WP_Systemio_Connect_Admin
     /**
      * Ajoute le lien "Réglages" sur la page des plugins.
      */
-    public static function add_settings_link($links)
-    {
-        $settings_link = '<a href="' . admin_url('options-general.php?page=wp-systemio-connect') . '">' . __('Réglages', 'wp-systemio-connect') . '</a>';
-        array_unshift($links, $settings_link); // Ajoute au début du tableau
+    public static function add_settings_link( $links ) {
+        // Pointer vers la nouvelle page principale (l'onglet par défaut sera chargé)
+        $settings_link = '<a href="' . admin_url( 'admin.php?page=wp-systemio-connect' ) . '">' . __( 'Réglages', 'wp-systemio-connect' ) . '</a>';
+        array_unshift( $links, $settings_link );
         return $links;
     }
 
@@ -59,7 +59,7 @@ class WP_Systemio_Connect_Admin
     {
         add_menu_page(
             __('Systeme.io Connect - Réglages', 'wp-systemio-connect'), // Titre de la page (balise <title>)
-            __('SIO Connect', 'wp-systemio-connect'),                  // Titre dans le menu
+            __('WP SIO Connect', 'wp-systemio-connect'),                  // Titre dans le menu
             'manage_options',                                             // Capacité requise
             'wp-systemio-connect',                                        // Slug de la page principale (identifiant unique)
             [__CLASS__, 'render_admin_page_wrapper'],                   // Fonction callback qui gérera l'affichage des onglets
@@ -166,6 +166,95 @@ class WP_Systemio_Connect_Admin
                 'wp_systemio_connect_section_divi' // Section
             );
         }
+    }
+
+    // Dans WP_Systemio_Connect_Admin
+    public static function render_admin_page_wrapper()
+    {
+        if (!current_user_can('manage_options')) {
+            return;
+        }
+
+        // Récupérer l'onglet actif, défaut sur 'forms'
+        $active_tab = isset($_GET['tab']) ? sanitize_key($_GET['tab']) : 'forms';
+
+        ?>
+        <div class="wrap">
+            <h1><?php esc_html_e('WP Systeme.io Connect', 'wp-systemio-connect'); ?></h1>
+
+            <nav class="nav-tab-wrapper wp-clearfix"
+                aria-label="<?php esc_attr_e('Onglets secondaires', 'wp-systemio-connect'); ?>">
+                <a href="?page=wp-systemio-connect&tab=forms"
+                    class="nav-tab <?php echo $active_tab === 'forms' ? 'nav-tab-active' : ''; ?>">
+                    <?php esc_html_e('Formulaires', 'wp-systemio-connect'); ?>
+                </a>
+                <a href="?page=wp-systemio-connect&tab=contacts"
+                    class="nav-tab <?php echo $active_tab === 'contacts' ? 'nav-tab-active' : ''; ?>">
+                    <?php esc_html_e('Contacts', 'wp-systemio-connect'); ?>
+                </a>
+                <a href="?page=wp-systemio-connect&tab=tags"
+                    class="nav-tab <?php echo $active_tab === 'tags' ? 'nav-tab-active' : ''; ?>">
+                    <?php esc_html_e('Tags', 'wp-systemio-connect'); ?>
+                </a>
+                <a href="?page=wp-systemio-connect&tab=settings"
+                    class="nav-tab <?php echo $active_tab === 'settings' ? 'nav-tab-active' : ''; ?>">
+                    <?php esc_html_e('Réglages API', 'wp-systemio-connect'); ?>
+                </a>
+                <!-- Ajouter futurs onglets ici -->
+            </nav>
+
+            <div class="tab-content" style="margin-top: 20px;">
+                <?php
+                // Appeler la fonction de rendu pour l'onglet actif
+                switch ($active_tab) {
+                    case 'contacts':
+                        self::render_contacts_tab();
+                        break;
+                    case 'tags':
+                        self::render_tags_tab();
+                        break;
+                    case 'settings':
+                        self::render_settings_tab();
+                        break;
+                    case 'forms':
+                    default:
+                        self::render_forms_tab();
+                        break;
+                }
+                ?>
+            </div><!-- .tab-content -->
+
+        </div><!-- .wrap -->
+        <?php
+    }
+
+    // Créer des méthodes vides (ou avec placeholder) pour chaque onglet pour l'instant
+    public static function render_forms_tab()
+    {
+        echo '<h2>' . esc_html__('Configuration des Formulaires', 'wp-systemio-connect') . '</h2>';
+        echo '<p>' . esc_html__('Le contenu de la configuration des formulaires (CF7, Elementor, Divi) ira ici.', 'wp-systemio-connect') . '</p>';
+        // On déplacera la logique de rendu et de sauvegarde ici plus tard
+    }
+
+    public static function render_contacts_tab()
+    {
+        echo '<h2>' . esc_html__('Gestion des Contacts Systeme.io', 'wp-systemio-connect') . '</h2>';
+        echo '<p>' . esc_html__('La liste des contacts SIO sera affichée ici.', 'wp-systemio-connect') . '</p>';
+        // Implémentation future
+    }
+
+    public static function render_tags_tab()
+    {
+        echo '<h2>' . esc_html__('Gestion des Tags Systeme.io', 'wp-systemio-connect') . '</h2>';
+        echo '<p>' . esc_html__('La liste des tags SIO sera affichée ici.', 'wp-systemio-connect') . '</p>';
+        // Implémentation future
+    }
+
+    public static function render_settings_tab()
+    {
+        echo '<h2>' . esc_html__('Réglages de Connexion API Systeme.io', 'wp-systemio-connect') . '</h2>';
+        echo '<p>' . esc_html__('Les champs Clé API, URL API et le bouton Test iront ici.', 'wp-systemio-connect') . '</p>';
+        // On déplacera la logique de rendu et de sauvegarde ici plus tard
     }
 
     /**

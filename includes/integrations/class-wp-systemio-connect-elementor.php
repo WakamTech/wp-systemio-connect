@@ -123,62 +123,36 @@ class WP_Systemio_Connect_Elementor
             }
         }
 
-        // --- Préparation de l'appel API SIO ---
-        // *** C'est ici qu'on pourrait appeler une fonction centralisée ***
-        // Pour l'instant, on duplique un peu la logique de CF7
+        // --- Nouvelle Logique d'Envoi via le Service API ---
+        $api_service = new WP_Systemio_Connect_Api_Service(); // Instancier le service
 
-        $api_endpoint = $api_base_url . '/contacts';
-        $contact_data = ['email' => $email];
-        if (!empty($first_name)) {
-            $contact_data['firstName'] = $first_name;
-        }
-        if (!empty($last_name)) {
-            $contact_data['lastName'] = $last_name;
-        }
-
-        error_log('[WP SIO Connect Elementor] contact_data  ' . print_r($contact_data, true));
-        if (!empty($tag_ids)) {
-            $tag_ids_int = array_map('intval', $tag_ids);
-            $tag_ids_int = array_filter($tag_ids_int);
-            if (!empty($tag_ids_int)) {
-                $contact_data['tags'] = $tag_ids_int;
-            }
-        }
-
-        $body_json = json_encode($contact_data);
-        if ($body_json === false) {
-            error_log('[WP SIO Connect Elementor] Erreur encodage JSON pour données contact SIO (Form ID: ' . $form_id . ').');
+        if (!$api_service) { // Gérer si le constructeur a échoué (Admin non chargé?)
+            error_log("[WP SIO Connect Divi] Failed to initialize API Service.");
             return;
         }
 
-        $args = [
-            'method' => 'POST',
-            'headers' => [
-                'X-API-Key' => $api_key,
-                'Accept' => 'application/json',
-                'Content-Type' => 'application/json',
-            ],
-            'body' => $body_json,
-            'timeout' => 15,
-        ];
+        // 1. Ajouter ou Mettre à jour le contact
+        error_log("[WP SIO Connect Divi] Calling add_or_update_contact for email: " . $email);
+        $contact_id = $api_service->add_or_update_contact($email, $first_name, $last_name);
 
-        // --- Exécution de l'appel API ---
-        error_log('[WP SIO Connect Elementor] Tentative ajout contact SIO depuis Elementor ID: ' . $form_id . ' - Email: ' . $email . ' - Tags: ' . implode(',', $tag_ids));
-        $response = wp_remote_post($api_endpoint, $args);
-
-        // --- Gestion de la réponse ---
-        if (is_wp_error($response)) {
-            error_log('[WP SIO Connect Elementor] Erreur WP API SIO (Form ID: ' . $form_id . ') : ' . $response->get_error_message());
-            // On pourrait vouloir notifier l'admin ici ? Ou juste logguer.
-        } else {
-            $response_code = wp_remote_retrieve_response_code($response);
-            $response_body = wp_remote_retrieve_body($response);
-
-            if ($response_code >= 200 && $response_code < 300) {
-                error_log('[WP SIO Connect Elementor] Succès API SIO (Form ID: ' . $form_id . ') : Contact ' . $email . ' ajouté/mis à jour. Code: ' . $response_code);
-            } else {
-                error_log('[WP SIO Connect Elementor] Erreur API SIO (Form ID: ' . $form_id . ') : Code ' . $response_code . ' - Réponse : ' . $response_body);
+        // 2. Si succès et si des tags sont sélectionnés, les ajouter un par un
+        if ($contact_id !== false && !empty($tag_ids)) {
+            error_log("[WP SIO Connect Divi] Contact processed (ID: $contact_id). Attempting to add " . count($tag_ids) . " tags.");
+            foreach ($tag_ids as $tag_to_add) {
+                $tag_id_int = absint($tag_to_add);
+                if ($tag_id_int > 0) {
+                    error_log("[WP SIO Connect Divi] Calling tag_contact for Contact ID: $contact_id, Tag ID: $tag_id_int");
+                    $tag_success = $api_service->tag_contact($contact_id, $tag_id_int);
+                    // On pourrait logguer si $tag_success est false
+                    if (!$tag_success) {
+                        error_log("[WP SIO Connect Divi] Failed to add tag ID: $tag_id_int to contact ID: $contact_id.");
+                    }
+                }
             }
+        } elseif ($contact_id === false) {
+            error_log("[WP SIO Connect Divi] Failed to add or update contact: " . $email);
+        } else {
+            error_log("[WP SIO Connect Divi] Contact processed (ID: $contact_id). No tags selected.");
         }
 
         // Remarque : On n'interagit pas avec $ajax_handler ici. La soumission Elementor

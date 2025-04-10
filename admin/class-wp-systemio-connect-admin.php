@@ -18,7 +18,10 @@ class WP_Systemio_Connect_Admin
         self::$options = get_option('wp_systemio_connect_options');
 
         // Ajouter la page d'options au menu Réglages
-        add_action('admin_menu', [__CLASS__, 'add_options_page']);
+        // add_action('admin_menu', [__CLASS__, 'add_options_page']);
+
+        // Dans WP_Systemio_Connect_Admin::init() ou une méthode dédiée à l'admin_menu
+        add_action('admin_menu', [__CLASS__, 'register_main_menu_page']);
 
         // Enregistrer les réglages, sections et champs
         add_action('admin_init', [__CLASS__, 'register_settings']);
@@ -51,6 +54,19 @@ class WP_Systemio_Connect_Admin
         );
     }
 
+    // Nouvelle méthode
+    public static function register_main_menu_page()
+    {
+        add_menu_page(
+            __('Systeme.io Connect - Réglages', 'wp-systemio-connect'), // Titre de la page (balise <title>)
+            __('SIO Connect', 'wp-systemio-connect'),                  // Titre dans le menu
+            'manage_options',                                             // Capacité requise
+            'wp-systemio-connect',                                        // Slug de la page principale (identifiant unique)
+            [__CLASS__, 'render_admin_page_wrapper'],                   // Fonction callback qui gérera l'affichage des onglets
+            'dashicons-email-alt',                                        // Icône (choisir dans les Dashicons)
+            75 // Position approximative dans le menu (plus bas = plus bas)
+        );
+    }
     /**
      * Enregistre les paramètres du plugin via l'API Settings de WordPress.
      */
@@ -129,6 +145,25 @@ class WP_Systemio_Connect_Admin
                 [__CLASS__, 'render_field_elementor_form_settings'], // Callback
                 'wp-systemio-connect', // Page
                 'wp_systemio_connect_section_elementor' // Section
+            );
+        }
+
+        // --- NOUVELLE SECTION : Intégration Divi ---
+        if (function_exists('et_builder_add_main_elements') || defined('ET_BUILDER_THEME')) { // Autre test pour Divi
+            add_settings_section(
+                'wp_systemio_connect_section_divi', // ID unique
+                __('Intégration Divi (Formulaire de Contact)', 'wp-systemio-connect'), // Titre
+                [__CLASS__, 'render_section_divi_description'], // Callback description
+                'wp-systemio-connect' // Page
+            );
+
+            // --- NOUVEAU CHAMP : Réglages des formulaires Divi ---
+            add_settings_field(
+                'divi_form_settings', // ID logique
+                __('Configuration des Formulaires', 'wp-systemio-connect'), // Label
+                [__CLASS__, 'render_field_divi_form_settings'], // Callback
+                'wp-systemio-connect', // Page
+                'wp_systemio_connect_section_divi' // Section
             );
         }
     }
@@ -679,8 +714,8 @@ class WP_Systemio_Connect_Admin
 
         // --- NOUVEAU: Nettoyage des options d'intégration Elementor ---
         if (isset($input['elementor_integrations']) && is_array($input['elementor_integrations'])) {
-            error_log('[WP SIO Connect Admin] Options being saved: ' ); // Log avant de retourner
-        
+            error_log('[WP SIO Connect Admin] Options being saved: '); // Log avant de retourner
+
             $sanitized_elementor = [];
             foreach ($input['elementor_integrations'] as $index_or_id => $settings) {
                 // Récupérer le vrai ID du formulaire depuis le champ dédié
@@ -732,8 +767,70 @@ class WP_Systemio_Connect_Admin
             $sanitized_options['elementor_integrations'] = $sanitized_elementor;
         }
 
-        error_log('[WP SIO Connect Admin] Options being saved: ' . print_r($sanitized_options, true)); // Log avant de retourner
-        
+
+        // --- NOUVEAU: Nettoyage Intégration Divi ---
+        if (isset($input['divi_integrations']) && is_array($input['divi_integrations'])) {
+            $sanitized_divi = [];
+            foreach ($input['divi_integrations'] as $index => $settings) {
+                $css_id = isset($settings['css_id']) ? sanitize_html_class(trim($settings['css_id'])) : ''; // sanitize_html_class est bien pour les ID/classes CSS
+
+                if (empty($css_id) || !is_array($settings)) {
+                    continue;
+                }
+
+                $sanitized_settings = [];
+                $sanitized_settings['enabled'] = isset($settings['enabled']) ? (bool) $settings['enabled'] : false;
+
+                // Nettoyer mapping champs (ID des champs Divi)
+                $sanitized_settings['email_field'] = isset($settings['email_field']) ? sanitize_text_field($settings['email_field']) : '';
+                $sanitized_settings['fname_field'] = isset($settings['fname_field']) ? sanitize_text_field($settings['fname_field']) : '';
+                $sanitized_settings['lname_field'] = isset($settings['lname_field']) ? sanitize_text_field($settings['lname_field']) : '';
+
+                // --- Nettoyage des Tags ---
+                if (isset($settings['tags'])) {
+                    if (is_array($settings['tags'])) {
+                        // Cas normal : vient des checkboxes cochées (ou d'une sauvegarde précédente)
+                        // Convertir chaque ID en entier positif et filtrer les zéros/invalides
+                        $sanitized_settings['tags'] = array_filter(array_map('absint', $settings['tags']));
+                        // Optionnel : Ré-indexer le tableau pour avoir des clés numériques séquentielles (0, 1, 2...)
+                        // $sanitized_settings['tags'] = array_values($sanitized_settings['tags']);
+                    } elseif (is_string($settings['tags']) && $settings['tags'] === '') {
+                        // Cas où aucune case n'est cochée, le champ caché envoie une chaîne vide
+                        $sanitized_settings['tags'] = []; // Stocker comme tableau vide
+                    } elseif (is_string($settings['tags']) && !empty($settings['tags'])) {
+                        // Cas où les données pourraient provenir d'un champ caché contenant des IDs lors d'une erreur de récupération API
+                        // On essaie de parser la chaîne comme si elle contenait des IDs séparés par des virgules
+                        $tags_raw = sanitize_text_field($settings['tags']);
+                        $tags_cleaned = preg_replace('/[^0-9,]/', '', $tags_raw);
+                        $tags_cleaned = trim(preg_replace('/,+/', ',', $tags_cleaned), ',');
+                        if (!empty($tags_cleaned)) {
+                            $tag_ids = array_map('absint', explode(',', $tags_cleaned));
+                            $sanitized_settings['tags'] = array_filter($tag_ids);
+                            // $sanitized_settings['tags'] = array_values($sanitized_settings['tags']); // Optionnel
+                        } else {
+                            $sanitized_settings['tags'] = [];
+                        }
+                    } else {
+                        // Cas par défaut ou inattendu (ni tableau, ni chaîne vide, ni chaîne d'IDs)
+                        $sanitized_settings['tags'] = [];
+                    }
+                } else {
+                    // Si la clé 'tags' n'est pas envoyée du tout (ne devrait pas arriver avec le champ caché)
+                    $sanitized_settings['tags'] = [];
+                }
+                // À ce stade, $sanitized_settings['tags'] devrait toujours être un tableau (potentiellement vide).
+
+                // Validation si activé (comme avant)
+                if ($sanitized_settings['enabled'] && empty($sanitized_settings['email_field'])) {
+                    add_settings_error( /* ... */);
+                }
+
+                $sanitized_divi[$css_id] = $sanitized_settings; // Utiliser l'ID CSS comme clé
+            }
+            $sanitized_options['divi_integrations'] = $sanitized_divi;
+        }
+
+
         return $sanitized_options;
     }
 
@@ -1081,7 +1178,9 @@ class WP_Systemio_Connect_Admin
                             input.setAttribute('name', newName);
                         });
                         // Mettre à jour aussi l'index data
-                        currentConfigDiv.dataset.index = newFormId || '__INDEX__';
+                        // ... calcul de newCssId (ou newFormName/newFormId) ...
+                        const replacementKey = newCssId || ('__INDEX__' + Date.now()); // Utilise un index unique si vide
+                        currentConfigDiv.dataset.index = replacementKey;
                         // Mettre à jour les ID/for des labels/champs si nécessaire (pas fait ici pour simplifier)
                     });
                 }
@@ -1122,6 +1221,375 @@ class WP_Systemio_Connect_Admin
         </script>
         <?php
     }
+
+    /**
+     * Affiche la description de la section d'intégration Divi.
+     */
+    public static function render_section_divi_description()
+    {
+        echo '<p>' . __('Configurez ici les modules "Formulaire de Contact" Divi que vous souhaitez connecter à Systeme.io.', 'wp-systemio-connect') . '</p>';
+        echo '<p><strong>' . __('Important :', 'wp-systemio-connect') . '</strong> ' . __('Pour chaque module Formulaire de Contact à connecter, vous devez lui assigner un <strong>ID CSS unique</strong> dans ses réglages Avancés (ID et classes CSS -> ID CSS).', 'wp-systemio-connect') . '</p>';
+        echo '<p>' . __('De plus, pour mapper les champs (Email, Prénom, etc.), vous devez assigner un <strong>ID de champ</strong> unique à chaque champ pertinent dans les réglages de ce champ (Avancé -> ID et classes CSS -> ID de champ).', 'wp-systemio-connect') . '</p>';
+    }
+
+    /**
+     * Affiche les options de configuration pour les formulaires Divi (basé sur ID CSS).
+     * Utilise une approche de répéteur similaire à Elementor.
+     */
+    public static function render_field_divi_form_settings()
+    {
+        // Récupérer les réglages Divi sauvegardés
+        $divi_settings = isset(self::$options['divi_integrations']) ? self::$options['divi_integrations'] : [];
+
+        ?>
+        <div id="wp-sio-divi-forms-container">
+            <?php
+            if (!empty($divi_settings)) {
+                foreach ($divi_settings as $css_id => $settings) {
+                    if (is_int($css_id))
+                        continue; // Skip numeric index if any issue during save
+                    self::render_divi_form_row($css_id, $settings);
+                }
+            } else {
+                self::render_divi_form_row('', []); // Ligne modèle vide
+            }
+            ?>
+            <!-- Modèle pour ajout dynamique -->
+            <template id="wp-sio-divi-form-row-template">
+                <?php self::render_divi_form_row('__INDEX__', []); ?>
+            </template>
+
+        </div>
+        <button type="button" id="wp-sio-add-divi-form" class="button">
+            <?php _e('Ajouter un formulaire Divi', 'wp-systemio-connect'); ?>
+        </button>
+
+        <?php
+        // Ajouter le JS pour le répéteur Divi (peut être factorisé avec Elementor JS ?)
+        self::add_divi_repeater_js(); // Fonction JS à créer, similaire à add_elementor_repeater_js
+    }
+
+    /**
+     * Affiche une ligne de configuration pour UN formulaire Divi.
+     *
+     * @param string $css_id L'ID CSS du module Formulaire (la clé dans nos options, ou __INDEX__...).
+     * @param array $settings Les réglages sauvegardés pour cette clé.
+     */
+    private static function render_divi_form_row($css_id, $settings)
+    {
+        // Utiliser l'ID CSS comme index pour les champs s'il est défini, sinon l'index temporaire
+        $index = $css_id ?: '__INDEX__' . uniqid(); // Assurer un index unique pour les nouvelles lignes
+
+        // Valeurs actuelles ou par défaut
+        $current_css_id = ($css_id && strpos($css_id, '__INDEX__') === false) ? $css_id : ''; // N'affiche que les vrais ID CSS sauvegardés
+        $enabled = isset($settings['enabled']) ? (bool) $settings['enabled'] : false;
+        // ID des CHAMPS définis dans Divi
+        $email_field = isset($settings['email_field']) ? $settings['email_field'] : ''; // Pas de suggestion par défaut, force l'utilisateur
+        $fname_field = isset($settings['fname_field']) ? $settings['fname_field'] : '';
+        $lname_field = isset($settings['lname_field']) ? $settings['lname_field'] : '';
+        $selected_tags = isset($settings['tags']) && is_array($settings['tags']) ? $settings['tags'] : [];
+
+        ?>
+        <div class="wp-sio-divi-form-config" data-index="<?php echo esc_attr($index); ?>"
+            style="border: 1px solid #ccd0d4; padding: 15px; margin-bottom: 15px; background: #f9f9f9;">
+            <table class="form-table" role="presentation">
+                <tbody>
+                    <tr>
+                        <th scope="row">
+                            <label for="wp_sio_divi_<?php echo esc_attr($index); ?>_css_id">
+                                <?php _e('ID CSS du Module Formulaire (*)', 'wp-systemio-connect'); ?>
+                            </label>
+                        </th>
+                        <td>
+                            <input type="text" id="wp_sio_divi_<?php echo esc_attr($index); ?>_css_id"
+                                name="wp_systemio_connect_options[divi_integrations][<?php echo esc_attr($index); ?>][css_id]"
+                                value="<?php echo esc_attr($current_css_id); ?>" class="regular-text wp-sio-divi-css-id-input"
+                                placeholder="<?php esc_attr_e('ID CSS unique défini dans Divi', 'wp-systemio-connect'); ?>"
+                                required>
+                            <p class="description">
+                                <?php _e('Doit correspondre à l\'ID CSS défini sur le module Formulaire (Avancé > ID et classes CSS > ID CSS).', 'wp-systemio-connect'); ?>
+                            </p>
+                        </td>
+                    </tr>
+                    <tr>
+                        <th scope="row">
+                            <label for="wp_sio_divi_<?php echo esc_attr($index); ?>_enabled">
+                                <?php _e('Activer pour Systeme.io', 'wp-systemio-connect'); ?>
+                            </label>
+                        </th>
+                        <td>
+                            <input type="hidden"
+                                name="wp_systemio_connect_options[divi_integrations][<?php echo esc_attr($index); ?>][enabled]"
+                                value="0">
+                            <input type="checkbox" id="wp_sio_divi_<?php echo esc_attr($index); ?>_enabled"
+                                name="wp_systemio_connect_options[divi_integrations][<?php echo esc_attr($index); ?>][enabled]"
+                                value="1" <?php checked($enabled, 1); ?> class="wp-sio-divi-enable-checkbox">
+                            <p class="description">
+                                <?php _e('Cochez pour envoyer les données de ce formulaire vers Systeme.io.', 'wp-systemio-connect'); ?>
+                            </p>
+                        </td>
+                    </tr>
+                    <tr class="wp-sio-divi-conditional-fields" style="<?php echo $enabled ? '' : 'display:none;'; ?>">
+                        <th scope="row">
+                            <label for="wp_sio_divi_<?php echo esc_attr($index); ?>_email_field">
+                                <?php _e('ID du Champ Email (*)', 'wp-systemio-connect'); ?>
+                            </label>
+                        </th>
+                        <td>
+                            <input type="text" id="wp_sio_divi_<?php echo esc_attr($index); ?>_email_field"
+                                name="wp_systemio_connect_options[divi_integrations][<?php echo esc_attr($index); ?>][email_field]"
+                                value="<?php echo esc_attr($email_field); ?>" class="regular-text"
+                                placeholder="<?php esc_attr_e('Ex: contact-email', 'wp-systemio-connect'); ?>" required>
+                            <p class="description">
+                                <?php _e('ID défini sur le champ Email lui-même (Réglages du champ > Avancé > ID de champ).', 'wp-systemio-connect'); ?>
+                            </p>
+                        </td>
+                    </tr>
+                    <tr class="wp-sio-divi-conditional-fields" style="<?php echo $enabled ? '' : 'display:none;'; ?>">
+                        <th scope="row">
+                            <label for="wp_sio_divi_<?php echo esc_attr($index); ?>_fname_field">
+                                <?php _e('ID du Champ Prénom', 'wp-systemio-connect'); ?>
+                            </label>
+                        </th>
+                        <td>
+                            <input type="text" id="wp_sio_divi_<?php echo esc_attr($index); ?>_fname_field"
+                                name="wp_systemio_connect_options[divi_integrations][<?php echo esc_attr($index); ?>][fname_field]"
+                                value="<?php echo esc_attr($fname_field); ?>" class="regular-text"
+                                placeholder="<?php esc_attr_e('Ex: contact-prenom', 'wp-systemio-connect'); ?>">
+                            <p class="description">
+                                <?php _e('ID défini sur le champ Prénom (ou Nom complet). Laisser vide si non utilisé.', 'wp-systemio-connect'); ?>
+                            </p>
+                        </td>
+                    </tr>
+                    <tr class="wp-sio-divi-conditional-fields" style="<?php echo $enabled ? '' : 'display:none;'; ?>">
+                        <th scope="row">
+                            <label for="wp_sio_divi_<?php echo esc_attr($index); ?>_lname_field">
+                                <?php _e('ID du Champ Nom', 'wp-systemio-connect'); ?>
+                            </label>
+                        </th>
+                        <td>
+                            <input type="text" id="wp_sio_divi_<?php echo esc_attr($index); ?>_lname_field"
+                                name="wp_systemio_connect_options[divi_integrations][<?php echo esc_attr($index); ?>][lname_field]"
+                                value="<?php echo esc_attr($lname_field); ?>" class="regular-text"
+                                placeholder="<?php esc_attr_e('Ex: contact-nom', 'wp-systemio-connect'); ?>">
+                            <p class="description">
+                                <?php _e('ID défini sur le champ Nom de famille. Laisser vide si non utilisé.', 'wp-systemio-connect'); ?>
+                            </p>
+                        </td>
+                    </tr>
+                    <tr class="wp-sio-divi-conditional-fields" style="<?php echo $enabled ? '' : 'display:none;'; ?>">
+                        <th scope="row">
+                            <?php _e('Tags Systeme.io', 'wp-systemio-connect'); ?>
+                        </th>
+                        <td>
+                            <?php
+                            // Essayer de récupérer les tags depuis la fonction mise en cache
+                            $available_tags = self::get_systemio_tags();
+
+                            if (is_wp_error($available_tags)) {
+                                // Afficher un message d'erreur si la récupération a échoué
+                                echo '<p class="notice notice-warning" style="margin-left: 0; padding: 5px;">';
+                                echo '<strong>' . __('Erreur de récupération des tags :', 'wp-systemio-connect') . '</strong><br>';
+                                echo esc_html($available_tags->get_error_message());
+                                echo '</p>';
+                                // Inclure des champs cachés pour les tags sélectionnés pour ne pas les perdre à la sauvegarde
+                                foreach ($selected_tags as $tag_id) {
+                                    if (!empty($tag_id)) { // S'assurer que l'ID n'est pas vide
+                                        echo '<input type="hidden" name="wp_systemio_connect_options[divi_integrations][' . esc_attr($index) . '][tags][]" value="' . esc_attr($tag_id) . '">';
+                                    }
+                                }
+                            } elseif (empty($available_tags)) {
+                                echo '<p>' . __('Aucun tag trouvé dans votre compte Systeme.io ou l\'API n\'est pas configurée.', 'wp-systemio-connect') . '</p>';
+                            } else {
+                                // Afficher les cases à cocher
+                                echo '<div class="wp-sio-tags-checkbox-list" style="max-height: 150px; overflow-y: auto; border: 1px solid #ccd0d4; padding: 5px; background: #fff;">';
+                                // Champ caché pour s'assurer que 'tags' est envoyé même si rien n'est coché (pour effacer la sélection précédente)
+                                echo '<input type="hidden" name="wp_systemio_connect_options[divi_integrations][' . esc_attr($index) . '][tags]" value="">';
+
+                                foreach ($available_tags as $tag_id => $tag_name) {
+                                    $checkbox_id = 'wp_sio_divi_' . esc_attr($index) . '_tag_' . $tag_id;
+                                    // S'assurer que la comparaison fonctionne (les IDs peuvent être entiers ou chaînes)
+                                    $is_checked = in_array((string) $tag_id, array_map('strval', $selected_tags), true);
+                                    ?>
+                                    <label for="<?php echo esc_attr($checkbox_id); ?>"
+                                        style="display: block; margin-bottom: 3px; font-weight: normal;">
+                                        <input type="checkbox" id="<?php echo esc_attr($checkbox_id); ?>"
+                                            name="wp_systemio_connect_options[divi_integrations][<?php echo esc_attr($index); ?>][tags][]"
+                                            value="<?php echo esc_attr($tag_id); ?>" <?php checked($is_checked); ?>>
+                                        <?php echo esc_html($tag_name); ?> (ID: <?php echo esc_html($tag_id); ?>)
+                                    </label>
+                                    <?php
+                                }
+                                echo '</div>'; // .wp-sio-tags-checkbox-list
+                                echo '<p class="description">' . __('Cochez les tags SIO à ajouter au contact lors de la soumission.', 'wp-systemio-connect') . '</p>';
+                            }
+                            ?>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td colspan="2" style="text-align: right; padding-top: 10px;">
+                            <button type="button" class="button button-link-delete wp-sio-remove-divi-form"
+                                style="color: #a00;">
+                                <?php _e('Supprimer ce formulaire', 'wp-systemio-connect'); ?>
+                            </button>
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+        </div><!-- .wp-sio-divi-form-config -->
+        <?php
+    }
+
+    /**
+     * Ajoute le script JS pour le répéteur Divi et l'affichage conditionnel.
+     * NOTE : Ce code est très similaire à celui d'Elementor. Une factorisation serait idéale
+     * dans une version ultérieure pour éviter la duplication.
+     */
+    private static function add_divi_repeater_js()
+    {
+        ?>
+        <script type="text/javascript">
+            document.addEventListener('DOMContentLoaded', function () {
+                const container = document.getElementById('wp-sio-divi-forms-container');
+                const template = document.getElementById('wp-sio-divi-form-row-template');
+                const addButton = document.getElementById('wp-sio-add-divi-form');
+
+                if (!container || !template || !addButton) {
+                    console.error('WP SIO Connect: Divi repeater JS elements not found.');
+                    return;
+                }
+
+                // --- Fonction pour gérer l'affichage conditionnel ---
+                function setupConditionalDisplay(formConfigDiv) {
+                    const checkbox = formConfigDiv.querySelector('.wp-sio-divi-enable-checkbox');
+                    const conditionalFields = formConfigDiv.querySelectorAll('.wp-sio-divi-conditional-fields');
+
+                    function toggleFields() {
+                        conditionalFields.forEach(fieldRow => {
+                            fieldRow.style.display = checkbox.checked ? '' : 'none';
+                        });
+                    }
+                    if (checkbox) {
+                        toggleFields(); // État initial
+                        checkbox.addEventListener('change', toggleFields);
+                    } else {
+                        console.warn('WP SIO Connect: Enable checkbox not found in Divi row', formConfigDiv);
+                    }
+                }
+
+                // --- Fonction pour gérer la suppression ---
+                function setupRemoveButton(formConfigDiv) {
+                    const removeButton = formConfigDiv.querySelector('.wp-sio-remove-divi-form');
+                    if (removeButton) {
+                        removeButton.addEventListener('click', function (e) {
+                            e.preventDefault();
+                            if (confirm('<?php echo esc_js(__('Êtes-vous sûr de vouloir supprimer la configuration de ce formulaire Divi ?', 'wp-systemio-connect')); ?>')) {
+                                formConfigDiv.remove();
+                                // S'assurer qu'il reste au moins une ligne (peut-être vide) pour l'ajout
+                                if (container.querySelectorAll('.wp-sio-divi-form-config').length === 0) {
+                                    addFormRow(); // Ajouter une nouvelle ligne vide si tout est supprimé
+                                }
+                            }
+                        });
+                    } else {
+                        console.warn('WP SIO Connect: Remove button not found in Divi row', formConfigDiv);
+                    }
+                }
+
+                // --- Fonction pour synchroniser l'ID CSS dans les attributs name ---
+                function setupCssIdSync(formConfigDiv) {
+                    const cssIdInput = formConfigDiv.querySelector('.wp-sio-divi-css-id-input');
+                    if (!cssIdInput) {
+                        console.warn('WP SIO Connect: CSS ID input not found in Divi row', formConfigDiv);
+                        return;
+                    }
+
+                    cssIdInput.addEventListener('input', function () {
+                        // Nettoyer l'ID pour usage comme clé et attribut
+                        // Autorise lettres, chiffres, tiret, underscore. Commence par une lettre ou underscore par sécurité pour CSS.
+                        let newCssId = this.value.trim();
+                        newCssId = newCssId.replace(/[^a-zA-Z0-9_-]/g, '');
+                        if (newCssId.length > 0 && ! /^[a-zA-Z_]/.test(newCssId)) {
+                            newCssId = '_' + newCssId; // Préfixer si ne commence pas par lettre/underscore
+                        }
+
+                        const currentConfigDiv = this.closest('.wp-sio-divi-form-config');
+                        const inputsToUpdate = currentConfigDiv.querySelectorAll('[name^="wp_systemio_connect_options[divi_integrations"]');
+                        // ... calcul de newCssId (ou newFormName/newFormId) ...
+                        const replacementKey = newCssId || ('__INDEX__' + Date.now()); // Utilise un index unique si vide
+                        currentConfigDiv.dataset.index = replacementKey;
+                        const currentKey = currentConfigDiv.dataset.index; // L'index actuel ou temporaire
+
+                        inputsToUpdate.forEach(input => {
+                            const nameAttr = input.getAttribute('name');
+                            if (nameAttr) {
+                                // Remplacer l'index/clé actuelle par le nouvel ID CSS (ou __INDEX__ si vide)
+                                // Regex pour cibler la clé spécifique à cette ligne
+                                const regex = new RegExp(`\\[divi_integrations\\]\\[${currentKey.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&')}\\]`); // Échapper les caractères spéciaux dans la clé actuelle
+                                const replacementKey = newCssId || '__INDEX__';
+                                const newName = nameAttr.replace(regex, `[divi_integrations][${replacementKey}]`);
+                                input.setAttribute('name', newName);
+                            }
+                        });
+                        // Mettre à jour aussi l'index data
+                        // ... calcul de newCssId (ou newFormName/newFormId) ...
+                        const replacementKey = newCssId || ('__INDEX__' + Date.now()); // Utilise un index unique si vide
+                        // ... remplacer la clé dans les attributs name en utilisant replacementKey ...
+                        currentConfigDiv.dataset.index = replacementKey;
+                        // On pourrait aussi vouloir mettre à jour les ID des champs et les 'for' des labels, mais c'est plus complexe et moins critique pour la sauvegarde
+                    });
+                }
+
+
+                // --- Fonction pour ajouter une nouvelle ligne ---
+                function addFormRow() {
+                    const clone = template.content.cloneNode(true);
+                    const newIndex = '__INDEX__' + Date.now(); // Utiliser un préfixe et timestamp comme index temporaire unique
+                    const newRow = clone.querySelector('.wp-sio-divi-form-config');
+
+                    if (!newRow) {
+                        console.error('WP SIO Connect: Could not find .wp-sio-divi-form-config in template clone.');
+                        return;
+                    }
+
+                    // Remplacer __INDEX__ par le nouvel index unique dans le HTML cloné
+                    // Faire la substitution sur les attributs pertinents plutôt que innerHTML pour préserver les events potentiels
+                    newRow.innerHTML = newRow.innerHTML.replace(/__INDEX__/g, newIndex); // Simple pour cet exemple
+                    newRow.dataset.index = newIndex; // Mettre à jour l'attribut data-index
+
+                    container.appendChild(newRow);
+
+                    // Ré-appliquer les gestionnaires d'événements sur la nouvelle ligne clonée et ajoutée
+                    const addedRowElement = container.querySelector(`[data-index="${newIndex}"]`);
+                    if (addedRowElement) {
+                        setupConditionalDisplay(addedRowElement);
+                        setupRemoveButton(addedRowElement);
+                        setupCssIdSync(addedRowElement);
+                    } else {
+                        console.error('WP SIO Connect: Could not find the newly added Divi row element.');
+                    }
+                }
+
+                // --- Initialisation ---
+
+                // Gérer l'ajout
+                addButton.addEventListener('click', function (e) {
+                    e.preventDefault();
+                    addFormRow();
+                });
+
+                // Appliquer les gestionnaires aux lignes existantes au chargement
+                container.querySelectorAll('.wp-sio-divi-form-config').forEach(row => {
+                    setupConditionalDisplay(row);
+                    setupRemoveButton(row);
+                    setupCssIdSync(row);
+                });
+
+            });
+        </script>
+        <?php
+    }
+
 } // Fin de la classe WP_Systemio_Connect_Admin
 
 

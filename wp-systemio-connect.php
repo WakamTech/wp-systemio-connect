@@ -29,11 +29,17 @@ define('WPSIO_CONNECT_PLUGIN_BASENAME', plugin_basename(__FILE__)); // Utile pou
 // Inclure la classe principale pour l'admin (nous allons la créer juste après)
 require_once WPSIO_CONNECT_PATH . 'admin/class-wp-systemio-connect-admin.php';
 
+// Inclure le fichier dans wp-systemio-connect.php
+require_once WPSIO_CONNECT_PATH . 'includes/class-wp-systemio-connect-api-service.php'; // <-- AJOUTER
+
 // Inclure la classe pour l'intégration Contact Form 7
 require_once WPSIO_CONNECT_PATH . 'includes/integrations/class-wp-systemio-connect-cf7.php'; // <-- AJOUTER CECI
 
 // Inclure la classe pour l'intégration Elementor Pro
 require_once WPSIO_CONNECT_PATH . 'includes/integrations/class-wp-systemio-connect-elementor.php'; // <-- AJOUTER
+
+// Inclure et initialiser Divi
+require_once WPSIO_CONNECT_PATH . 'includes/integrations/class-wp-systemio-connect-divi.php'; // <-- AJOUTER
 
 // Initialiser les fonctionnalités d'administration
 WP_Systemio_Connect_Admin::init();
@@ -50,9 +56,19 @@ function wp_systemio_connect_initialize_integrations()
 
     // Initialiser l'intégration Elementor SEULEMENT APRÈS que les plugins sont chargés
     WP_Systemio_Connect_Elementor::init();
+
+
 }
 
 // Accrocher notre fonction d'initialisation au bon moment
-add_action( 'plugins_loaded', 'wp_systemio_connect_initialize_integrations' );
+add_action('plugins_loaded', 'wp_systemio_connect_initialize_integrations');
+
+// Ajouter une fonction séparée pour Divi sur 'init'
+function wp_systemio_connect_initialize_divi()
+{
+    // init() vérifiera la classe ET_Builder_Module
+    WP_Systemio_Connect_Divi::init();
+}
+add_action('after_setup_theme', 'wp_systemio_connect_initialize_divi');
 
 ?>

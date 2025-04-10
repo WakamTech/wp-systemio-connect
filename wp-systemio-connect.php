@@ -32,10 +32,27 @@ require_once WPSIO_CONNECT_PATH . 'admin/class-wp-systemio-connect-admin.php';
 // Inclure la classe pour l'intégration Contact Form 7
 require_once WPSIO_CONNECT_PATH . 'includes/integrations/class-wp-systemio-connect-cf7.php'; // <-- AJOUTER CECI
 
+// Inclure la classe pour l'intégration Elementor Pro
+require_once WPSIO_CONNECT_PATH . 'includes/integrations/class-wp-systemio-connect-elementor.php'; // <-- AJOUTER
+
 // Initialiser les fonctionnalités d'administration
 WP_Systemio_Connect_Admin::init();
 
-// Initialiser l'intégration CF7
-WP_Systemio_Connect_CF7::init(); // <-- AJOUTER CECI
+/**
+ * Fonction d'initialisation principale du plugin, accrochée à plugins_loaded.
+ * C'est ici qu'on initialise les intégrations qui dépendent d'autres plugins.
+ */
+function wp_systemio_connect_initialize_integrations()
+{
+    // Initialiser l'intégration CF7 (on pourrait aussi la mettre ici pour la cohérence)
+    // Si on vérifie WPCF7_VERSION dans son init(), ça ne pose pas de problème de le laisser ici.
+    WP_Systemio_Connect_CF7::init();
+
+    // Initialiser l'intégration Elementor SEULEMENT APRÈS que les plugins sont chargés
+    WP_Systemio_Connect_Elementor::init();
+}
+
+// Accrocher notre fonction d'initialisation au bon moment
+add_action( 'plugins_loaded', 'wp_systemio_connect_initialize_integrations' );
 
 ?>

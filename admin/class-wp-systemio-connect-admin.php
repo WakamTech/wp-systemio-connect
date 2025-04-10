@@ -112,6 +112,25 @@ class WP_Systemio_Connect_Admin
             );
         }
 
+        // --- NOUVELLE SECTION : Intégration Elementor Pro ---
+        //    On l'affiche seulement si Elementor Pro est actif
+        if (class_exists('\ElementorPro\Modules\Forms\Classes\Form_Record')) {
+            add_settings_section(
+                'wp_systemio_connect_section_elementor', // ID unique
+                __('Intégration Elementor Pro Forms', 'wp-systemio-connect'), // Titre
+                [__CLASS__, 'render_section_elementor_description'], // Callback description
+                'wp-systemio-connect' // Page
+            );
+
+            // --- NOUVEAU CHAMP : Réglages des formulaires Elementor ---
+            add_settings_field(
+                'elementor_form_settings', // ID logique
+                __('Configuration des Formulaires', 'wp-systemio-connect'), // Label
+                [__CLASS__, 'render_field_elementor_form_settings'], // Callback
+                'wp-systemio-connect', // Page
+                'wp_systemio_connect_section_elementor' // Section
+            );
+        }
     }
 
     /**
@@ -658,6 +677,63 @@ class WP_Systemio_Connect_Admin
             $sanitized_options['cf7_integrations'] = $sanitized_cf7;
         }
 
+        // --- NOUVEAU: Nettoyage des options d'intégration Elementor ---
+        if (isset($input['elementor_integrations']) && is_array($input['elementor_integrations'])) {
+            error_log('[WP SIO Connect Admin] Options being saved: ' ); // Log avant de retourner
+        
+            $sanitized_elementor = [];
+            foreach ($input['elementor_integrations'] as $index_or_id => $settings) {
+                // Récupérer le vrai ID du formulaire depuis le champ dédié
+                $form_id = isset($settings['form_id']) ? sanitize_text_field(trim($settings['form_id'])) : '';
+
+                // Si l'ID est vide ou si ce n'est pas un tableau de settings valide, on ignore cette ligne
+                if (empty($form_id) || !is_array($settings)) {
+                    continue;
+                }
+
+                // Utiliser $form_id comme clé pour le tableau final
+                $sanitized_settings = [];
+                $sanitized_settings['enabled'] = isset($settings['enabled']) ? (bool) $settings['enabled'] : false;
+
+                // Nettoyer les champs de mapping et tags (similaire à CF7)
+                $sanitized_settings['email_field'] = isset($settings['email_field']) ? sanitize_text_field($settings['email_field']) : '';
+                $sanitized_settings['fname_field'] = isset($settings['fname_field']) ? sanitize_text_field($settings['fname_field']) : '';
+                $sanitized_settings['lname_field'] = isset($settings['lname_field']) ? sanitize_text_field($settings['lname_field']) : '';
+
+                if (isset($settings['tags'])) {
+                    if (is_array($settings['tags'])) {
+                        $sanitized_settings['tags'] = array_filter(array_map('absint', $settings['tags']));
+                    } elseif (is_string($settings['tags']) && $settings['tags'] === '') {
+                        $sanitized_settings['tags'] = [];
+                    } else {
+                        $sanitized_settings['tags'] = []; // Fallback
+                    }
+                } else {
+                    $sanitized_settings['tags'] = [];
+                }
+
+
+                // Validation cruciale : ID Formulaire et Champ Email doivent être définis si activé
+                if ($sanitized_settings['enabled']) {
+                    if (empty($sanitized_settings['email_field'])) {
+                        add_settings_error(
+                            'wp_systemio_connect_options',
+                            'elementor_email_missing_' . $form_id,
+                            sprintf(__('Attention : L\'ID du Champ Email est obligatoire pour le formulaire Elementor "%s" lorsqu\'il est activé.', 'wp-systemio-connect'), esc_html($form_id)),
+                            'warning'
+                        );
+                        // On pourrait désactiver ici pour forcer la correction :
+                        // $sanitized_settings['enabled'] = false;
+                    }
+                }
+                // Même si désactivé, on stocke la config pour ne pas la perdre
+                $sanitized_elementor[$form_id] = $sanitized_settings; // Utiliser le vrai form_id comme clé
+            }
+            $sanitized_options['elementor_integrations'] = $sanitized_elementor;
+        }
+
+        error_log('[WP SIO Connect Admin] Options being saved: ' . print_r($sanitized_options, true)); // Log avant de retourner
+        
         return $sanitized_options;
     }
 
@@ -737,6 +813,314 @@ class WP_Systemio_Connect_Admin
             error_log('[WP SIO Connect] Erreur API SIO lors de la récupération des tags : Code ' . $response_code . ' - ' . $error_message);
             return new WP_Error('api_error', sprintf(__('Erreur API Systeme.io (Code: %d) : %s', 'wp-systemio-connect'), $response_code, esc_html($error_message)));
         }
+    }
+
+    /**
+     * Affiche la description de la section d'intégration Elementor.
+     */
+    public static function render_section_elementor_description()
+    {
+        echo '<p>' . __('Configurez ici les formulaires Elementor Pro que vous souhaitez connecter à Systeme.io.', 'wp-systemio-connect') . '</p>';
+        echo '<p>' . __('Vous devez spécifier l\'<b>ID du formulaire</b> défini dans les réglages du widget Formulaire Elementor (onglet "Avancé" > "ID CSS" ou onglet "Contenu" > "Options additionnelles" > "ID").', 'wp-systemio-connect') . '</p>';
+    }
+
+    /**
+     * Affiche les options de configuration pour les formulaires Elementor.
+     * Utilise une approche de répéteur simple pour ajouter/supprimer des formulaires.
+     */
+    public static function render_field_elementor_form_settings()
+    {
+        // Récupérer les réglages Elementor sauvegardés
+        $elementor_settings = isset(self::$options['elementor_integrations']) ? self::$options['elementor_integrations'] : [];
+
+        ?>
+        <div id="wp-sio-elementor-forms-container">
+            <?php
+            // Afficher les formulaires déjà configurés
+            if (!empty($elementor_settings)) {
+                foreach ($elementor_settings as $form_id => $settings) {
+                    // S'assurer que l'ID n'est pas juste un index numérique si on a mal sauvegardé
+                    if (is_int($form_id))
+                        continue;
+                    self::render_elementor_form_row($form_id, $settings);
+                }
+            } else {
+                // Afficher une ligne vide par défaut si aucun n'est configuré
+                self::render_elementor_form_row('', []); // Ligne modèle vide
+            }
+            ?>
+            <!-- Modèle pour ajouter dynamiquement (via JS) -->
+            <template id="wp-sio-elementor-form-row-template">
+                <?php self::render_elementor_form_row('__INDEX__', []); ?>
+            </template>
+
+        </div>
+        <button type="button" id="wp-sio-add-elementor-form" class="button">
+            <?php _e('Ajouter un formulaire Elementor', 'wp-systemio-connect'); ?>
+        </button>
+
+        <?php
+        // Ajouter le JS pour le répéteur
+        self::add_elementor_repeater_js();
+    }
+
+    /**
+     * Affiche une ligne de configuration pour UN formulaire Elementor.
+     *
+     * @param string $form_id L'ID du formulaire Elementor (la clé dans notre tableau d'options).
+     * @param array $settings Les réglages sauvegardés pour ce formulaire.
+     */
+    private static function render_elementor_form_row($form_id, $settings)
+    {
+        $form_id_attr = esc_attr($form_id); // Pour les attributs HTML
+        // Générer un index unique pour les nouveaux champs (remplacé par le vrai form_id à la sauvegarde)
+        $index = $form_id ? $form_id : '__INDEX__';
+
+        // Valeurs par défaut
+        $enabled = isset($settings['enabled']) ? (bool) $settings['enabled'] : false;
+        $email_field = isset($settings['email_field']) ? $settings['email_field'] : 'email'; // Suggestion
+        $fname_field = isset($settings['fname_field']) ? $settings['fname_field'] : 'name'; // Suggestion
+        $lname_field = isset($settings['lname_field']) ? $settings['lname_field'] : '';
+        $selected_tags = isset($settings['tags']) && is_array($settings['tags']) ? $settings['tags'] : [];
+
+        ?>
+        <div class="wp-sio-elementor-form-config" data-index="<?php echo $index; ?>"
+            style="border: 1px solid #ccd0d4; padding: 15px; margin-bottom: 15px; background: #f0f0f0;">
+            <table class="form-table" role="presentation">
+                <tbody>
+                    <tr>
+                        <th scope="row">
+                            <label for="wp_sio_elementor_<?php echo $index; ?>_form_id">
+                                <?php _e('ID du Formulaire Elementor (*)', 'wp-systemio-connect'); ?>
+                            </label>
+                        </th>
+                        <td>
+                            <input type="text" id="wp_sio_elementor_<?php echo $index; ?>_form_id"
+                                name="wp_systemio_connect_options[elementor_integrations][<?php echo $index; ?>][form_id]"
+                                value="<?php echo $form_id_attr; ?>" class="regular-text wp-sio-elementor-form-id-input"
+                                placeholder="<?php esc_attr_e('ID défini dans Elementor', 'wp-systemio-connect'); ?>" required>
+                            <p class="description">
+                                <?php _e('Doit correspondre exactement à l\'ID du formulaire dans Elementor.', 'wp-systemio-connect'); ?>
+                            </p>
+                        </td>
+                    </tr>
+                    <tr>
+                        <th scope="row">
+                            <label for="wp_sio_elementor_<?php echo $index; ?>_enabled">
+                                <?php _e('Activer pour Systeme.io', 'wp-systemio-connect'); ?>
+                            </label>
+                        </th>
+                        <td>
+                            <input type="hidden"
+                                name="wp_systemio_connect_options[elementor_integrations][<?php echo $index; ?>][enabled]"
+                                value="0">
+                            <input type="checkbox" id="wp_sio_elementor_<?php echo $index; ?>_enabled"
+                                name="wp_systemio_connect_options[elementor_integrations][<?php echo $index; ?>][enabled]"
+                                value="1" <?php checked($enabled, 1); ?> class="wp-sio-elementor-enable-checkbox">
+                            <p class="description">
+                                <?php _e('Cochez pour envoyer les données de ce formulaire vers Systeme.io.', 'wp-systemio-connect'); ?>
+                            </p>
+                        </td>
+                    </tr>
+                    <tr class="wp-sio-elementor-conditional-fields" style="<?php echo $enabled ? '' : 'display:none;'; ?>">
+                        <th scope="row">
+                            <label for="wp_sio_elementor_<?php echo $index; ?>_email_field">
+                                <?php _e('ID Champ Email (*)', 'wp-systemio-connect'); ?>
+                            </label>
+                        </th>
+                        <td>
+                            <input type="text" id="wp_sio_elementor_<?php echo $index; ?>_email_field"
+                                name="wp_systemio_connect_options[elementor_integrations][<?php echo $index; ?>][email_field]"
+                                value="<?php echo esc_attr($email_field); ?>" class="regular-text" placeholder="email" required>
+                            <p class="description">
+                                <?php _e('ID du champ Email dans le formulaire Elementor (ex: email).', 'wp-systemio-connect'); ?>
+                            </p>
+                        </td>
+                    </tr>
+                    <tr class="wp-sio-elementor-conditional-fields" style="<?php echo $enabled ? '' : 'display:none;'; ?>">
+                        <th scope="row">
+                            <label for="wp_sio_elementor_<?php echo $index; ?>_fname_field">
+                                <?php _e('ID Champ Prénom', 'wp-systemio-connect'); ?>
+                            </label>
+                        </th>
+                        <td>
+                            <input type="text" id="wp_sio_elementor_<?php echo $index; ?>_fname_field"
+                                name="wp_systemio_connect_options[elementor_integrations][<?php echo $index; ?>][fname_field]"
+                                value="<?php echo esc_attr($fname_field); ?>" class="regular-text" placeholder="name">
+                            <p class="description">
+                                <?php _e('ID du champ Prénom/Nom (ex: name, fname). Laisser vide si non utilisé.', 'wp-systemio-connect'); ?>
+                            </p>
+                        </td>
+                    </tr>
+                    <tr class="wp-sio-elementor-conditional-fields" style="<?php echo $enabled ? '' : 'display:none;'; ?>">
+                        <th scope="row">
+                            <label for="wp_sio_elementor_<?php echo $index; ?>_lname_field">
+                                <?php _e('ID Champ Nom', 'wp-systemio-connect'); ?>
+                            </label>
+                        </th>
+                        <td>
+                            <input type="text" id="wp_sio_elementor_<?php echo $index; ?>_lname_field"
+                                name="wp_systemio_connect_options[elementor_integrations][<?php echo $index; ?>][lname_field]"
+                                value="<?php echo esc_attr($lname_field); ?>" class="regular-text" placeholder="lname">
+                            <p class="description">
+                                <?php _e('ID du champ Nom de famille (ex: lname). Laisser vide si non utilisé.', 'wp-systemio-connect'); ?>
+                            </p>
+                        </td>
+                    </tr>
+                    <tr class="wp-sio-elementor-conditional-fields" style="<?php echo $enabled ? '' : 'display:none;'; ?>">
+                        <th scope="row">
+                            <?php _e('Tags Systeme.io', 'wp-systemio-connect'); ?>
+                        </th>
+                        <td>
+                            <?php /* Réutilisation de la logique d'affichage des tags CF7 */
+                            $available_tags = self::get_systemio_tags();
+                            if (is_wp_error($available_tags)) { /* Afficher erreur */
+                                echo '<p class="notice notice-warning" style="margin-left: 0;">';
+                                echo '<strong>' . __('Erreur tags :', 'wp-systemio-connect') . '</strong> ' . esc_html($available_tags->get_error_message());
+                                echo '</p>';
+                                // Champ caché pour préserver la sélection
+                                echo '<input type="hidden" name="wp_systemio_connect_options[elementor_integrations][' . $index . '][tags]" value="' . esc_attr(json_encode($selected_tags)) . '">'; // Store as JSON string? Safer might be individual hidden fields if needed. For now, let sanitize handle it.
+                            } elseif (empty($available_tags)) { /* Aucun tag trouvé */
+                                echo '<p>' . __('Aucun tag trouvé.', 'wp-systemio-connect') . '</p>';
+                            } else { ?>
+                                <div class="wp-sio-tags-checkbox-list"
+                                    style="max-height: 150px; overflow-y: auto; border: 1px solid #ccd0d4; padding: 5px; background: #f9f9f9;">
+                                    <input type="hidden"
+                                        name="wp_systemio_connect_options[elementor_integrations][<?php echo $index; ?>][tags]"
+                                        value="">
+                                    <?php foreach ($available_tags as $tag_id => $tag_name):
+                                        $checkbox_id = 'wp_sio_elementor_' . $index . '_tag_' . $tag_id;
+                                        $is_checked = in_array((string) $tag_id, array_map('strval', $selected_tags)); // Ensure string comparison
+                                        ?>
+                                        <label for="<?php echo esc_attr($checkbox_id); ?>" style="display: block; margin-bottom: 3px;">
+                                            <input type="checkbox" id="<?php echo esc_attr($checkbox_id); ?>"
+                                                name="wp_systemio_connect_options[elementor_integrations][<?php echo $index; ?>][tags][]"
+                                                value="<?php echo esc_attr($tag_id); ?>" <?php checked($is_checked); ?>>
+                                            <?php echo esc_html($tag_name); ?> (ID: <?php echo esc_html($tag_id); ?>)
+                                        </label>
+                                    <?php endforeach; ?>
+                                </div>
+                                <p class="description"><?php _e('Cochez les tags à ajouter.', 'wp-systemio-connect'); ?></p>
+                            <?php } // Fin else $available_tags ?>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td colspan="2" style="text-align: right;">
+                            <button type="button" class="button button-link-delete wp-sio-remove-elementor-form">
+                                <?php _e('Supprimer ce formulaire', 'wp-systemio-connect'); ?>
+                            </button>
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+        </div><!-- .wp-sio-elementor-form-config -->
+        <?php
+    }
+
+    /**
+     * Ajoute le script JS pour le répéteur Elementor et l'affichage conditionnel.
+     */
+    private static function add_elementor_repeater_js()
+    {
+        ?>
+        <script type="text/javascript">
+            document.addEventListener('DOMContentLoaded', function () {
+                const container = document.getElementById('wp-sio-elementor-forms-container');
+                const template = document.getElementById('wp-sio-elementor-form-row-template');
+                const addButton = document.getElementById('wp-sio-add-elementor-form');
+
+                if (!container || !template || !addButton) return;
+
+                // Fonction pour gérer l'affichage conditionnel
+                function setupConditionalDisplay(formConfigDiv) {
+                    const checkbox = formConfigDiv.querySelector('.wp-sio-elementor-enable-checkbox');
+                    const conditionalFields = formConfigDiv.querySelectorAll('.wp-sio-elementor-conditional-fields');
+
+                    function toggleFields() {
+                        conditionalFields.forEach(fieldRow => {
+                            fieldRow.style.display = checkbox.checked ? '' : 'none';
+                        });
+                    }
+                    if (checkbox) {
+                        toggleFields(); // État initial
+                        checkbox.addEventListener('change', toggleFields);
+                    }
+                }
+
+                // Fonction pour gérer la suppression
+                function setupRemoveButton(formConfigDiv) {
+                    const removeButton = formConfigDiv.querySelector('.wp-sio-remove-elementor-form');
+                    if (removeButton) {
+                        removeButton.addEventListener('click', function (e) {
+                            e.preventDefault();
+                            if (confirm('<?php echo esc_js(__('Êtes-vous sûr de vouloir supprimer la configuration de ce formulaire ?', 'wp-systemio-connect')); ?>')) {
+                                formConfigDiv.remove();
+                                // S'assurer qu'il reste au moins une ligne (peut-être vide) ? Optionnel.
+                                if (container.querySelectorAll('.wp-sio-elementor-form-config').length === 0) {
+                                    addFormRow(); // Ajouter une nouvelle ligne vide si tout est supprimé
+                                }
+                            }
+                        });
+                    }
+                }
+
+                // Fonction pour gérer le changement d'ID de formulaire dans les attributs name
+                function setupFormIdSync(formConfigDiv) {
+                    const formIdInput = formConfigDiv.querySelector('.wp-sio-elementor-form-id-input');
+                    if (!formIdInput) return;
+
+                    formIdInput.addEventListener('input', function () {
+                        const newFormId = this.value.trim().replace(/[^a-zA-Z0-9_-]/g, ''); // Nettoyer l'ID pour l'usage comme clé
+                        const currentConfigDiv = this.closest('.wp-sio-elementor-form-config');
+                        const inputsToUpdate = currentConfigDiv.querySelectorAll('[name^="wp_systemio_connect_options[elementor_integrations"]');
+
+                        inputsToUpdate.forEach(input => {
+                            const nameAttr = input.getAttribute('name');
+                            // Remplacer l'index (ex: __INDEX__ ou l'ancien form_id) par le nouveau
+                            const newName = nameAttr.replace(/\[elementor_integrations\]\[([^\]]+)\]/, `[elementor_integrations][${newFormId || '__INDEX__'}]`);
+                            input.setAttribute('name', newName);
+                        });
+                        // Mettre à jour aussi l'index data
+                        currentConfigDiv.dataset.index = newFormId || '__INDEX__';
+                        // Mettre à jour les ID/for des labels/champs si nécessaire (pas fait ici pour simplifier)
+                    });
+                }
+
+
+                // Fonction pour ajouter une nouvelle ligne
+                function addFormRow() {
+                    const clone = template.content.cloneNode(true);
+                    const newIndex = Date.now(); // Utiliser un timestamp comme index temporaire unique
+                    const newRow = clone.querySelector('.wp-sio-elementor-form-config');
+
+                    // Remplacer __INDEX__ par le nouvel index unique dans le HTML cloné
+                    newRow.innerHTML = newRow.innerHTML.replace(/__INDEX__/g, newIndex);
+                    newRow.dataset.index = newIndex; // Mettre à jour l'attribut data-index
+
+                    container.appendChild(newRow);
+
+                    // Ré-appliquer les gestionnaires d'événements sur la nouvelle ligne
+                    setupConditionalDisplay(newRow);
+                    setupRemoveButton(newRow);
+                    setupFormIdSync(newRow);
+                }
+
+                // Gérer l'ajout
+                addButton.addEventListener('click', function (e) {
+                    e.preventDefault();
+                    addFormRow();
+                });
+
+                // Appliquer les gestionnaires aux lignes existantes au chargement
+                container.querySelectorAll('.wp-sio-elementor-form-config').forEach(row => {
+                    setupConditionalDisplay(row);
+                    setupRemoveButton(row);
+                    setupFormIdSync(row);
+                });
+
+            });
+        </script>
+        <?php
     }
 } // Fin de la classe WP_Systemio_Connect_Admin
 

@@ -201,7 +201,61 @@ class WP_Systemio_Connect_Api_Service
         }
     }
 
-    // On pourrait ajouter ici la méthode get_tags() également pour tout centraliser
+    /**
+     * Récupère une liste de contacts depuis Systeme.io.
+     * Gère la pagination basique.
+     *
+     * @param int $page Le numéro de page à récupérer (commence à 1).
+     * @param int $limit Le nombre de contacts par page (max SIO ? 50 ou 100 ? vérifier doc).
+     * @return array|WP_Error Tableau ['items' => array, 'total' => int, 'current_page' => int, 'per_page' => int, 'last_page' => int] ou WP_Error.
+     */
+    public function get_contacts($page = 1, $limit = 50)
+    {
+        // Construire l'endpoint avec les paramètres de pagination
+        // L'API V2 utilise souvent 'page' et 'limit'
+        $endpoint = '/contacts?page=' . absint($page) . '&limit=' . absint($limit);
+
+        // Faire l'appel GET
+        $result = $this->make_request('GET', $endpoint);
+
+        // Vérifier les erreurs WP
+        if (is_wp_error($result)) {
+            error_log('[WP SIO Connect API Service] get_contacts: WP Error - ' . $result->get_error_message());
+            return $result; // Renvoyer l'erreur WP
+        }
+
+        // Vérifier le code de réponse HTTP (devrait être 200 OK)
+        if ($result['code'] === 200 && is_array($result['body']) && isset($result['body']['items'])) {
+            // Succès ! L'API V2 retourne souvent une structure avec 'items' et des métadonnées de pagination
+            $contacts = $result['body']['items'];
+            $pagination_info = [
+                'total' => isset($result['body']['total']) ? (int) $result['body']['total'] : count($contacts), // Total d'items sur toutes les pages
+                'current_page' => isset($result['body']['page']) ? (int) $result['body']['page'] : $page,
+                'per_page' => isset($result['body']['limit']) ? (int) $result['body']['limit'] : $limit,
+                // Calculer la dernière page
+                'last_page' => 0,
+            ];
+            if ($pagination_info['per_page'] > 0 && $pagination_info['total'] > 0) {
+                $pagination_info['last_page'] = ceil($pagination_info['total'] / $pagination_info['per_page']);
+            } elseif (!empty($contacts)) {
+                $pagination_info['last_page'] = $pagination_info['current_page']; // Si pas d'info totale, on suppose qu'on est sur la seule/dernière page
+            }
+
+
+            error_log('[WP SIO Connect API Service] get_contacts: Success - Retrieved ' . count($contacts) . ' contacts for page ' . $page);
+
+            return [
+                'items' => $contacts,
+                'pagination' => $pagination_info,
+            ];
+
+        } else {
+            // Erreur de l'API SIO ou format de réponse inattendu
+            $error_message = is_array($result['body']) && isset($result['body']['message']) ? $result['body']['message'] : print_r($result['body'], true);
+            error_log('[WP SIO Connect API Service] get_contacts: API Error ' . $result['code'] . '. Message: ' . $error_message);
+            return new WP_Error('api_error_get_contacts', sprintf(__('Erreur API Systeme.io (%d) lors de la récupération des contacts: %s', 'wp-systemio-connect'), $result['code'], esc_html($error_message)));
+        }
+    }
 
 } // Fin de la classe WP_Systemio_Connect_Api_Service
 ?>

@@ -28,6 +28,8 @@ class WP_Systemio_Connect_Admin
 
         // Ajouter un lien "Réglages" sur la page des plugins (optionnel mais pratique)
         add_filter('plugin_action_links_' . WPSIO_CONNECT_PLUGIN_BASENAME, [__CLASS__, 'add_settings_link']);
+
+
     }
 
     /**
@@ -296,13 +298,117 @@ class WP_Systemio_Connect_Admin
         <?php
     }
 
+    /**
+     * Affiche le contenu de l'onglet Contacts : soit la liste, soit le formulaire d'ajout/modification.
+     */
     public static function render_contacts_tab()
     {
-        echo '<h2>' . esc_html__('Gestion des Contacts Systeme.io', 'wp-systemio-connect') . '</h2>';
-        echo '<p>' . esc_html__('La liste des contacts SIO sera affichée ici.', 'wp-systemio-connect') . '</p>';
-        // Implémentation future
-    }
+        // Déterminer l'action demandée (lister par défaut)
+        $action = isset($_GET['action']) ? sanitize_key($_GET['action']) : 'list';
 
+        // --- Affichage du Titre et du Bouton Ajouter ---
+        echo '<h2>';
+        esc_html_e('Contacts Systeme.io', 'wp-systemio-connect');
+
+        // Afficher le bouton "Ajouter" seulement si on est sur la vue liste
+        if ($action === 'list') {
+            printf(
+                ' <a href="%s" class="page-title-action">%s</a>',
+                esc_url(admin_url('admin.php?page=wp-systemio-connect&tab=contacts&action=add_new')),
+                esc_html__('Ajouter un contact', 'wp-systemio-connect')
+            );
+        }
+        echo '</h2>';
+
+        // --- Afficher les Messages de Statut (Succès/Erreur) ---
+        if (isset($_GET['message'])) {
+            $message_code = sanitize_key($_GET['message']);
+            $message_text = '';
+            $message_type = 'info'; // success, error, warning, info
+
+            switch ($message_code) {
+                case 'contact_added_tags_ok':
+                    $message_text = __('Contact ajouté avec succès à Systeme.io (tags inclus).', 'wp-systemio-connect');
+                    $message_type = 'success';
+                    break;
+                case 'contact_added_tags_error':
+                    $message_text = __('Contact ajouté avec succès, mais une erreur est survenue lors de l\'assignation d\'un ou plusieurs tags. Vérifiez les logs.', 'wp-systemio-connect');
+                    $message_type = 'warning';
+                    break;
+                case 'contact_updated': // Pour le futur
+                    $message_text = __('Contact mis à jour avec succès.', 'wp-systemio-connect');
+                    $message_type = 'success';
+                    break;
+                case 'contact_deleted': // Pour le futur
+                    $message_text = __('Contact supprimé avec succès.', 'wp-systemio-connect');
+                    $message_type = 'success';
+                    break;
+                case 'add_error_email':
+                    $message_text = __('Erreur : L\'adresse email fournie était invalide ou manquante.', 'wp-systemio-connect');
+                    $message_type = 'error';
+                    break;
+                case 'add_error_api':
+                    $message_text = __('Erreur : Impossible d\'ajouter ou mettre à jour le contact via l\'API Systeme.io. Vérifiez les logs pour plus de détails.', 'wp-systemio-connect');
+                    $message_type = 'error';
+                    break;
+                case 'add_error_internal':
+                    $message_text = __('Une erreur interne s\'est produite. Impossible de traiter la demande.', 'wp-systemio-connect');
+                    $message_type = 'error';
+                    break;
+                // Ajouter d'autres cas futurs ici
+            }
+
+            if ($message_text) {
+                echo '<div id="message" class="notice notice-' . esc_attr($message_type) . ' is-dismissible"><p>' . esc_html($message_text) . '</p></div>';
+            }
+        }
+
+        // --- Vérification de la Clé API (essentiel pour toute action) ---
+        if (!self::get_api_key()) {
+            echo '<div class="notice notice-error"><p>';
+            printf(
+                __('<strong>Action requise :</strong> Veuillez <a href="%s">configurer votre clé API Systeme.io</a> dans l\'onglet Réglages API pour accéder aux contacts.', 'wp-systemio-connect'),
+                esc_url(admin_url('admin.php?page=wp-systemio-connect&tab=settings'))
+            );
+            echo '</p></div>';
+            return; // Ne rien afficher d'autre si la clé manque
+        }
+
+        // --- Affichage Conditionnel : Formulaire ou Liste ---
+        if ($action === 'add_new' /* || $action === 'edit_contact' */) { // Décommenter pour l'édition future
+            // Afficher le formulaire d'ajout/modification
+            self::render_contact_form( /* $action */); // Passer l'action si render_contact_form gère l'édition
+        } else {
+            // Afficher la liste des contacts par défaut
+            echo '<p>' . esc_html__('Liste des contacts récupérés depuis votre compte Systeme.io.', 'wp-systemio-connect') . '</p>';
+
+            // Inclure, Instancier et Afficher la WP_List_Table
+            require_once WPSIO_CONNECT_PATH . 'admin/class-wp-systemio-contacts-list-table.php';
+            $api_service = new WP_Systemio_Connect_Api_Service();
+            if (!$api_service || !method_exists($api_service, 'get_contacts')) {
+                echo '<div class="notice notice-error"><p>' . esc_html__('Erreur interne: Service API non disponible.', 'wp-systemio-connect') . '</p></div>';
+                return;
+            }
+            $list_table = new WP_Systemio_Contacts_List_Table($api_service);
+            $list_table->prepare_items(); // Fait l'appel API et gère les erreurs API internes
+
+            // Ajouter un formulaire autour pour la pagination et les actions futures (bulk actions, filtres...)
+            ?>
+            <form method="get">
+                <?php // Champs cachés importants pour WP_List_Table (pagination, tri) et notre navigation ?>
+                <input type="hidden" name="page" value="<?php echo esc_attr($_REQUEST['page'] ?? 'wp-systemio-connect'); ?>" />
+                <input type="hidden" name="tab" value="contacts" />
+                <?php // Ajouter d'autres champs cachés si on ajoute des filtres ou du tri ?>
+
+                <?php
+                // Afficher la table (gère aussi "aucun item trouvé")
+                $list_table->display();
+                ?>
+            </form>
+            <?php
+        } // Fin du else (affichage liste)
+
+    } // Fin render_contacts_tab
     public static function render_tags_tab()
     {
         echo '<h2>' . esc_html__('Gestion des Tags Systeme.io', 'wp-systemio-connect') . '</h2>';
@@ -1799,6 +1905,180 @@ class WP_Systemio_Connect_Admin
         <?php
     }
 
+    // Dans WP_Systemio_Connect_Admin
+    /**
+     * Affiche le formulaire dédié pour ajouter un nouveau contact SIO.
+     */
+    private static function render_contact_form()
+    {
+        $page_title = __('Ajouter un nouveau contact Systeme.io', 'wp-systemio-connect');
+        $submit_button_text = __('Ajouter le Contact', 'wp-systemio-connect');
+        $action_nonce = 'wp_sio_add_contact_nonce';
+        $action_name = 'wp_sio_add_contact'; // Action pour admin-post
+
+        ?>
+        <h3><?php echo esc_html($page_title); ?></h3>
+        <p><?php esc_html_e('Entrez les informations du contact et sélectionnez les tags à assigner.', 'wp-systemio-connect'); ?>
+        </p>
+
+        <form method="post" action="<?php echo esc_url(admin_url('admin-post.php')); ?>">
+            <?php // Champs cachés pour la sécurité et l'action ?>
+            <input type="hidden" name="action" value="<?php echo esc_attr($action_name); ?>">
+            <?php wp_nonce_field($action_nonce, 'wp_sio_contact_nonce'); ?>
+
+            <table class="form-table">
+                <tbody>
+                    <tr class="form-field form-required">
+                        <th scope="row">
+                            <label for="sio_contact_email"><?php _e('Email', 'wp-systemio-connect'); ?> <span
+                                    class="description">(requis)</span></label>
+                        </th>
+                        <td>
+                            <input type="email" id="sio_contact_email" name="sio_contact[email]" value="" required
+                                aria-required="true" class="regular-text">
+                        </td>
+                    </tr>
+                    <tr class="form-field">
+                        <th scope="row">
+                            <label for="sio_contact_fname"><?php _e('Prénom', 'wp-systemio-connect'); ?></label>
+                        </th>
+                        <td>
+                            <input type="text" id="sio_contact_fname" name="sio_contact[first_name]" value=""
+                                class="regular-text">
+                        </td>
+                    </tr>
+                    <tr class="form-field">
+                        <th scope="row">
+                            <label for="sio_contact_lname"><?php _e('Nom', 'wp-systemio-connect'); ?></label>
+                        </th>
+                        <td>
+                            <input type="text" id="sio_contact_lname" name="sio_contact[last_name]" value=""
+                                class="regular-text">
+                        </td>
+                    </tr>
+                    <tr class="form-field">
+                        <th scope="row">
+                            <?php _e('Assigner des Tags', 'wp-systemio-connect'); ?>
+                        </th>
+                        <td>
+                            <?php
+                            // Récupérer les tags disponibles via la méthode de la classe Admin (ou Service API si on l'y déplace)
+                            $available_tags = self::get_systemio_tags(); // Ou $api_service->get_tags();
+                    
+                            if (is_wp_error($available_tags)) {
+                                echo '<p class="notice notice-warning inline" style="margin-left: 0;">' . sprintf(esc_html__('Erreur de récupération des tags : %s', 'wp-systemio-connect'), esc_html($available_tags->get_error_message())) . '</p>';
+                            } elseif (empty($available_tags)) {
+                                echo '<p>' . __('Aucun tag trouvé dans votre compte Systeme.io.', 'wp-systemio-connect') . '</p>';
+                            } else {
+                                echo '<div class="wp-sio-tags-checkbox-list" style="max-height: 200px; overflow-y: auto; border: 1px solid #ccd0d4; padding: 10px; background: #fff;">';
+                                // Pas besoin de champ caché ici car si rien n'est coché, le tableau 'tags' ne sera pas envoyé, ce qui est ok.
+                                foreach ($available_tags as $tag_id => $tag_name) {
+                                    $checkbox_id = 'sio_contact_tag_' . $tag_id;
+                                    ?>
+                                    <label for="<?php echo esc_attr($checkbox_id); ?>"
+                                        style="display: block; margin-bottom: 5px; font-weight: normal;">
+                                        <input type="checkbox" id="<?php echo esc_attr($checkbox_id); ?>" name="sio_contact[tags][]"
+                                            <?php // Envoyer comme un tableau d'IDs ?> value="<?php echo esc_attr($tag_id); ?>">
+                                        <?php echo esc_html($tag_name); ?> (ID: <?php echo esc_html($tag_id); ?>)
+                                    </label>
+                                    <?php
+                                }
+                                echo '</div>'; // .wp-sio-tags-checkbox-list
+                                echo '<p class="description">' . __('Cochez les tags à assigner à ce nouveau contact.', 'wp-systemio-connect') . '</p>';
+                            }
+                            ?>
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <?php submit_button($submit_button_text); ?>
+            <a href="<?php echo esc_url(admin_url('admin.php?page=wp-systemio-connect&tab=contacts')); ?>"
+                class="button button-secondary"><?php _e('Annuler', 'wp-systemio-connect'); ?></a>
+
+        </form>
+        <?php
+    }
+
+    // Dans WP_Systemio_Connect_Admin
+    /**
+     * Gère la soumission du formulaire d'ajout de contact.
+     */
+    public static function handle_add_contact()
+    {
+        error_log("[WP SIO Connect Admin] Contact created/updated. Adding ");
+
+        // 1. Nonce & Permissions Check (comme avant)
+        if (!isset($_POST['wp_sio_contact_nonce']) || !wp_verify_nonce($_POST['wp_sio_contact_nonce'], 'wp_sio_add_contact_nonce')) {
+            wp_die( /*...*/);
+        }
+        if (!current_user_can('manage_options')) {
+            wp_die( /*...*/);
+        }
+
+        // 3. Récupérer et valider les données
+        $contact_data = isset($_POST['sio_contact']) && is_array($_POST['sio_contact']) ? $_POST['sio_contact'] : [];
+        $email = isset($contact_data['email']) ? sanitize_email(trim($contact_data['email'])) : ''; // trim() ajouté
+        $first_name = isset($contact_data['first_name']) ? sanitize_text_field(trim($contact_data['first_name'])) : ''; // trim() ajouté
+        $last_name = isset($contact_data['last_name']) ? sanitize_text_field(trim($contact_data['last_name'])) : ''; // trim() ajouté
+        // Récupérer les tags sélectionnés
+        $selected_tags = isset($contact_data['tags']) && is_array($contact_data['tags']) ? $contact_data['tags'] : [];
+        // Nettoyer les IDs de tags (s'assurer que ce sont des entiers)
+        $selected_tags = array_filter(array_map('absint', $selected_tags));
+
+        // Valider l'email
+        if (empty($email) || !is_email($email)) {
+            wp_redirect(admin_url('admin.php?page=wp-systemio-connect&tab=contacts&action=add_new&message=add_error_email')); // Rediriger vers le formulaire avec erreur
+            exit;
+        }
+
+        // 4. Appeler le service API
+        $api_service = new WP_Systemio_Connect_Api_Service();
+        if (!$api_service || !method_exists($api_service, 'add_or_update_contact') || !method_exists($api_service, 'tag_contact')) {
+            error_log('[WP SIO Connect Admin] API Service not available or methods missing.');
+            wp_redirect(admin_url('admin.php?page=wp-systemio-connect&tab=contacts&message=add_error_internal')); // Erreur interne
+            exit;
+        }
+
+        $contact_id = $api_service->add_or_update_contact($email, $first_name, $last_name);
+
+        // 5. Gérer le résultat
+        $redirect_url = admin_url('admin.php?page=wp-systemio-connect&tab=contacts');
+
+        if ($contact_id !== false) {
+            // Succès création/màj contact ! Maintenant, ajouter les tags.
+            $tags_added_successfully = true; // Supposer le succès initialement
+            if (!empty($selected_tags)) {
+                error_log("[WP SIO Connect Admin] Contact $contact_id created/updated. Adding " . count($selected_tags) . " tags.");
+                foreach ($selected_tags as $tag_id) {
+                    $tag_success = $api_service->tag_contact($contact_id, $tag_id);
+                    if (!$tag_success) {
+                        $tags_added_successfully = false; // Marquer si un tag échoue
+                        error_log("[WP SIO Connect Admin] Failed to add tag $tag_id to contact $contact_id.");
+                        // Continuer d'essayer les autres tags ? Oui.
+                    }
+                }
+            }
+
+            // Adapter le message de redirection
+            if ($tags_added_successfully) {
+                $redirect_url = add_query_arg('message', 'contact_added_tags_ok', $redirect_url);
+            } else {
+                $redirect_url = add_query_arg('message', 'contact_added_tags_error', $redirect_url); // Succès partiel
+            }
+
+        } else {
+            // Échec création/màj contact
+            $redirect_url = add_query_arg('message', 'add_error_api', $redirect_url);
+        }
+
+        wp_redirect($redirect_url);
+        exit;
+    }
+
+    // Ne pas oublier l'action admin_post pour cette fonction :
+    // add_action( 'admin_post_wp_sio_add_contact', [ 'WP_Systemio_Connect_Admin', 'handle_add_contact' ] );
+
 } // Fin de la classe WP_Systemio_Connect_Admin
 
 
@@ -1806,4 +2086,6 @@ class WP_Systemio_Connect_Admin
 // Hook pour l'action admin-post déclenchée par le bouton de test
 add_action('admin_post_wp_systemio_connect_test_connection', ['WP_Systemio_Connect_Admin', 'handle_test_connection']);
 
+// Dans wp-systemio-connect.php (ou WP_Systemio_Connect_Admin::init())
+add_action('admin_post_wp_sio_add_contact', ['WP_Systemio_Connect_Admin', 'handle_add_contact']);
 ?>

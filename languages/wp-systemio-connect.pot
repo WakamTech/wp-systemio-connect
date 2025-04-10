@@ -1,0 +1,562 @@
+# Copyright (C) 2025 BO-VO Digital
+# This file is distributed under the GPL v2 or later.
+msgid ""
+msgstr ""
+"Project-Id-Version: WP Systeme.io Connect 0.1.0\n"
+"Report-Msgid-Bugs-To: https://wordpress.org/support/plugin/wp-systemio-connect\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language-Team: LANGUAGE <LL@li.org>\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"POT-Creation-Date: 2025-04-10T07:58:26+02:00\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"X-Generator: WP-CLI 2.11.0\n"
+"X-Domain: wp-systemio-connect\n"
+
+#. Plugin Name of the plugin
+#: wp-systemio-connect.php
+#: admin/class-wp-systemio-connect-admin.php:52
+#: admin/class-wp-systemio-connect-admin.php:181
+msgid "WP Systeme.io Connect"
+msgstr ""
+
+#. Plugin URI of the plugin
+#: wp-systemio-connect.php
+msgid "https://github.com/WakamTech/wp-systemio-connect"
+msgstr ""
+
+#. Description of the plugin
+#: wp-systemio-connect.php
+msgid "<?php echo esc_attr_e( 'Connecte les formulaires WordPress à Systeme.io pour une gestion facile des emails.', 'wp-systemio-connect' );"
+msgstr ""
+
+#. Author of the plugin
+#: wp-systemio-connect.php
+msgid "BO-VO Digital"
+msgstr ""
+
+#. Author URI of the plugin
+#: wp-systemio-connect.php
+msgid "https://bovo-digital.tech/"
+msgstr ""
+
+#: admin/class-wp-systemio-connect-admin.php:41
+msgid "Réglages"
+msgstr ""
+
+#: admin/class-wp-systemio-connect-admin.php:53
+msgid "Systeme.io Connect"
+msgstr ""
+
+#: admin/class-wp-systemio-connect-admin.php:64
+msgid "Systeme.io Connect - Réglages"
+msgstr ""
+
+#: admin/class-wp-systemio-connect-admin.php:65
+msgid "WP SIO Connect"
+msgstr ""
+
+#: admin/class-wp-systemio-connect-admin.php:87
+msgid "Connexion API Systeme.io"
+msgstr ""
+
+#: admin/class-wp-systemio-connect-admin.php:94
+msgid "Clé API Systeme.io"
+msgstr ""
+
+#: admin/class-wp-systemio-connect-admin.php:103
+msgid "URL API Systeme.io"
+msgstr ""
+
+#: admin/class-wp-systemio-connect-admin.php:121
+msgid "Intégration Contact Form 7"
+msgstr ""
+
+#: admin/class-wp-systemio-connect-admin.php:127
+msgid "Configuration des Formulaires CF7"
+msgstr ""
+
+#: admin/class-wp-systemio-connect-admin.php:138
+msgid "Intégration Elementor Pro Forms"
+msgstr ""
+
+#: admin/class-wp-systemio-connect-admin.php:144
+msgid "Configuration des Formulaires Elementor"
+msgstr ""
+
+#: admin/class-wp-systemio-connect-admin.php:155
+msgid "Intégration Divi (Formulaire de Contact)"
+msgstr ""
+
+#: admin/class-wp-systemio-connect-admin.php:161
+msgid "Configuration des Formulaires Divi"
+msgstr ""
+
+#: admin/class-wp-systemio-connect-admin.php:221
+msgid "Onglets secondaires"
+msgstr ""
+
+#: admin/class-wp-systemio-connect-admin.php:224
+msgid "Formulaires"
+msgstr ""
+
+#: admin/class-wp-systemio-connect-admin.php:228
+msgid "Contacts"
+msgstr ""
+
+#: admin/class-wp-systemio-connect-admin.php:232
+#: admin/class-wp-systemio-contacts-list-table.php:38
+msgid "Tags"
+msgstr ""
+
+#: admin/class-wp-systemio-connect-admin.php:236
+msgid "Réglages API"
+msgstr ""
+
+#: admin/class-wp-systemio-connect-admin.php:269
+msgid "Configuration des Intégrations de Formulaires"
+msgstr ""
+
+#: admin/class-wp-systemio-connect-admin.php:270
+msgid "Activez et configurez les formulaires que vous souhaitez connecter à Systeme.io."
+msgstr ""
+
+#: admin/class-wp-systemio-connect-admin.php:276
+msgid "Veuillez d'abord <a href=\"%s\">configurer votre clé API Systeme.io</a> dans l'onglet Réglages API pour activer ces options."
+msgstr ""
+
+#: admin/class-wp-systemio-connect-admin.php:295
+msgid "Enregistrer les Réglages des Formulaires"
+msgstr ""
+
+#: admin/class-wp-systemio-connect-admin.php:311
+msgid "Contacts Systeme.io"
+msgstr ""
+
+#: admin/class-wp-systemio-connect-admin.php:318
+msgid "Ajouter un contact"
+msgstr ""
+
+#: admin/class-wp-systemio-connect-admin.php:331
+msgid "Contact ajouté avec succès à Systeme.io (tags inclus)."
+msgstr ""
+
+#: admin/class-wp-systemio-connect-admin.php:335
+msgid "Contact ajouté avec succès, mais une erreur est survenue lors de l'assignation d'un ou plusieurs tags. Vérifiez les logs."
+msgstr ""
+
+#: admin/class-wp-systemio-connect-admin.php:339
+msgid "Contact mis à jour avec succès."
+msgstr ""
+
+#: admin/class-wp-systemio-connect-admin.php:343
+msgid "Contact supprimé avec succès."
+msgstr ""
+
+#: admin/class-wp-systemio-connect-admin.php:347
+msgid "Erreur : L'adresse email fournie était invalide ou manquante."
+msgstr ""
+
+#: admin/class-wp-systemio-connect-admin.php:351
+msgid "Erreur : Impossible d'ajouter ou mettre à jour le contact via l'API Systeme.io. Vérifiez les logs pour plus de détails."
+msgstr ""
+
+#: admin/class-wp-systemio-connect-admin.php:355
+msgid "Une erreur interne s'est produite. Impossible de traiter la demande."
+msgstr ""
+
+#: admin/class-wp-systemio-connect-admin.php:370
+msgid "<strong>Action requise :</strong> Veuillez <a href=\"%s\">configurer votre clé API Systeme.io</a> dans l'onglet Réglages API pour accéder aux contacts."
+msgstr ""
+
+#: admin/class-wp-systemio-connect-admin.php:383
+msgid "Liste des contacts récupérés depuis votre compte Systeme.io."
+msgstr ""
+
+#: admin/class-wp-systemio-connect-admin.php:389
+msgid "Erreur interne: Service API non disponible."
+msgstr ""
+
+#: admin/class-wp-systemio-connect-admin.php:414
+msgid "Gestion des Tags Systeme.io"
+msgstr ""
+
+#: admin/class-wp-systemio-connect-admin.php:415
+msgid "La liste des tags SIO sera affichée ici."
+msgstr ""
+
+#: admin/class-wp-systemio-connect-admin.php:431
+msgid "Enregistrer les Réglages API"
+msgstr ""
+
+#: admin/class-wp-systemio-connect-admin.php:437
+#: admin/class-wp-systemio-connect-admin.php:525
+msgid "Tester la Connexion API"
+msgstr ""
+
+#: admin/class-wp-systemio-connect-admin.php:438
+#: admin/class-wp-systemio-connect-admin.php:526
+msgid "Cliquez sur le bouton ci-dessous pour vérifier si la clé API enregistrée fonctionne."
+msgstr ""
+
+#: admin/class-wp-systemio-connect-admin.php:443
+#: admin/class-wp-systemio-connect-admin.php:531
+msgid "Tester la Connexion"
+msgstr ""
+
+#: admin/class-wp-systemio-connect-admin.php:453
+msgid "Entrez votre clé API Systeme.io pour connecter votre site."
+msgstr ""
+
+#: admin/class-wp-systemio-connect-admin.php:466
+msgid "Votre clé API secrète"
+msgstr ""
+
+#: admin/class-wp-systemio-connect-admin.php:469
+msgid "Vous pouvez trouver votre clé API dans vos <a href=\"%s\" target=\"_blank\">paramètres Systeme.io</a> (section Clé API publique)."
+msgstr ""
+
+#: admin/class-wp-systemio-connect-admin.php:489
+msgid "Laissez la valeur par défaut sauf si vous savez ce que vous faites."
+msgstr ""
+
+#: admin/class-wp-systemio-connect-admin.php:519
+msgid "Enregistrer les modifications"
+msgstr ""
+
+#: admin/class-wp-systemio-connect-admin.php:547
+msgid "Échec de la vérification de sécurité."
+msgstr ""
+
+#: admin/class-wp-systemio-connect-admin.php:552
+msgid "Vous n'avez pas les permissions suffisantes pour effectuer cette action."
+msgstr ""
+
+#: admin/class-wp-systemio-connect-admin.php:565
+msgid "Erreur : La clé API n'est pas configurée. Veuillez l'enregistrer avant de tester."
+msgstr ""
+
+#: admin/class-wp-systemio-connect-admin.php:588
+msgid "Erreur WordPress lors de la connexion à l'API : "
+msgstr ""
+
+#: admin/class-wp-systemio-connect-admin.php:602
+msgid "Succès ! Connexion à l'API Systeme.io établie. (Code: %d)"
+msgstr ""
+
+#: admin/class-wp-systemio-connect-admin.php:612
+msgid "%d tags trouvés."
+msgstr ""
+
+#: admin/class-wp-systemio-connect-admin.php:619
+msgid "Erreur inconnue de l'API."
+msgstr ""
+
+#: admin/class-wp-systemio-connect-admin.php:632
+msgid "Erreur de l'API Systeme.io (Code: %d) : %s"
+msgstr ""
+
+#: admin/class-wp-systemio-connect-admin.php:700
+msgid "Configurez ici comment vos formulaires Contact Form 7 envoient des données à Systeme.io."
+msgstr ""
+
+#: admin/class-wp-systemio-connect-admin.php:711
+msgid "Aucun formulaire Contact Form 7 trouvé ou le plugin n'est pas actif."
+msgstr ""
+
+#: admin/class-wp-systemio-connect-admin.php:743
+#: admin/class-wp-systemio-connect-admin.php:1322
+#: admin/class-wp-systemio-connect-admin.php:1632
+msgid "Activer pour Systeme.io"
+msgstr ""
+
+#: admin/class-wp-systemio-connect-admin.php:754
+#: admin/class-wp-systemio-connect-admin.php:1333
+#: admin/class-wp-systemio-connect-admin.php:1643
+msgid "Cochez pour envoyer les données de ce formulaire vers Systeme.io."
+msgstr ""
+
+#: admin/class-wp-systemio-connect-admin.php:761
+msgid "Champ Email (*)"
+msgstr ""
+
+#: admin/class-wp-systemio-connect-admin.php:770
+msgid "Nom du champ CF7 contenant l'adresse email (ex: your-email)."
+msgstr ""
+
+#: admin/class-wp-systemio-connect-admin.php:777
+msgid "Champ Prénom"
+msgstr ""
+
+#: admin/class-wp-systemio-connect-admin.php:785
+msgid "Nom du champ CF7 pour le prénom (ex: your-name, first-name). Laisser vide si non utilisé."
+msgstr ""
+
+#: admin/class-wp-systemio-connect-admin.php:792
+msgid "Champ Nom"
+msgstr ""
+
+#: admin/class-wp-systemio-connect-admin.php:800
+msgid "Nom du champ CF7 pour le nom de famille (ex: last-name). Laisser vide si non utilisé."
+msgstr ""
+
+#: admin/class-wp-systemio-connect-admin.php:807
+#: admin/class-wp-systemio-connect-admin.php:1384
+#: admin/class-wp-systemio-connect-admin.php:1697
+msgid "Tags Systeme.io"
+msgstr ""
+
+#: admin/class-wp-systemio-connect-admin.php:817
+#: admin/class-wp-systemio-connect-admin.php:1707
+msgid "Erreur de récupération des tags :"
+msgstr ""
+
+#: admin/class-wp-systemio-connect-admin.php:827
+msgid "Aucun tag trouvé dans votre compte Systeme.io ou l'API n'est pas configuréedd."
+msgstr ""
+
+#: admin/class-wp-systemio-connect-admin.php:847
+msgid "Cochez les tags à ajouter au contact lors de la soumission."
+msgstr ""
+
+#: admin/class-wp-systemio-connect-admin.php:988
+msgid "Attention : Le champ Email est obligatoire pour le formulaire CF7 ID %d lorsqu'il est activé pour Systeme.io."
+msgstr ""
+
+#: admin/class-wp-systemio-connect-admin.php:1060
+msgid "Attention : L'ID du Champ Email est obligatoire pour le formulaire Elementor \"%s\" lorsqu'il est activé."
+msgstr ""
+
+#: admin/class-wp-systemio-connect-admin.php:1175
+#: includes/class-wp-systemio-connect-api-service.php:54
+msgid "L'API Systeme.io n'est pas configurée."
+msgstr ""
+
+#: admin/class-wp-systemio-connect-admin.php:1219
+msgid "Impossible de récupérer les tags."
+msgstr ""
+
+#: admin/class-wp-systemio-connect-admin.php:1226
+msgid "Erreur API Systeme.io (Code: %d) : %s"
+msgstr ""
+
+#: admin/class-wp-systemio-connect-admin.php:1235
+msgid "Configurez ici les formulaires Elementor Pro que vous souhaitez connecter à Systeme.io."
+msgstr ""
+
+#: admin/class-wp-systemio-connect-admin.php:1236
+msgid "Vous devez spécifier l'<b>ID du formulaire</b> défini dans les réglages du widget Formulaire Elementor (onglet \"Avancé\" > \"ID CSS\" ou onglet \"Contenu\" > \"Options additionnelles\" > \"ID\")."
+msgstr ""
+
+#: admin/class-wp-systemio-connect-admin.php:1271
+msgid "Ajouter un formulaire Elementor"
+msgstr ""
+
+#: admin/class-wp-systemio-connect-admin.php:1306
+msgid "ID du Formulaire Elementor (*)"
+msgstr ""
+
+#: admin/class-wp-systemio-connect-admin.php:1313
+msgid "ID défini dans Elementor"
+msgstr ""
+
+#: admin/class-wp-systemio-connect-admin.php:1315
+msgid "Doit correspondre exactement à l'ID du formulaire dans Elementor."
+msgstr ""
+
+#: admin/class-wp-systemio-connect-admin.php:1340
+msgid "ID Champ Email (*)"
+msgstr ""
+
+#: admin/class-wp-systemio-connect-admin.php:1348
+msgid "ID du champ Email dans le formulaire Elementor (ex: email)."
+msgstr ""
+
+#: admin/class-wp-systemio-connect-admin.php:1355
+msgid "ID Champ Prénom"
+msgstr ""
+
+#: admin/class-wp-systemio-connect-admin.php:1363
+msgid "ID du champ Prénom/Nom (ex: name, fname). Laisser vide si non utilisé."
+msgstr ""
+
+#: admin/class-wp-systemio-connect-admin.php:1370
+msgid "ID Champ Nom"
+msgstr ""
+
+#: admin/class-wp-systemio-connect-admin.php:1378
+msgid "ID du champ Nom de famille (ex: lname). Laisser vide si non utilisé."
+msgstr ""
+
+#: admin/class-wp-systemio-connect-admin.php:1391
+msgid "Erreur tags :"
+msgstr ""
+
+#: admin/class-wp-systemio-connect-admin.php:1396
+msgid "Aucun tag trouvé."
+msgstr ""
+
+#: admin/class-wp-systemio-connect-admin.php:1415
+msgid "Cochez les tags à ajouter."
+msgstr ""
+
+#: admin/class-wp-systemio-connect-admin.php:1422
+#: admin/class-wp-systemio-connect-admin.php:1748
+msgid "Supprimer ce formulaire"
+msgstr ""
+
+#: admin/class-wp-systemio-connect-admin.php:1468
+msgid "Êtes-vous sûr de vouloir supprimer la configuration de ce formulaire ?"
+msgstr ""
+
+#: admin/class-wp-systemio-connect-admin.php:1545
+msgid "Configurez ici les modules \"Formulaire de Contact\" Divi que vous souhaitez connecter à Systeme.io."
+msgstr ""
+
+#: admin/class-wp-systemio-connect-admin.php:1546
+msgid "Important :"
+msgstr ""
+
+#: admin/class-wp-systemio-connect-admin.php:1546
+msgid "Pour chaque module Formulaire de Contact à connecter, vous devez lui assigner un <strong>ID CSS unique</strong> dans ses réglages Avancés (ID et classes CSS -> ID CSS)."
+msgstr ""
+
+#: admin/class-wp-systemio-connect-admin.php:1547
+msgid "De plus, pour mapper les champs (Email, Prénom, etc.), vous devez assigner un <strong>ID de champ</strong> unique à chaque champ pertinent dans les réglages de ce champ (Avancé -> ID et classes CSS -> ID de champ)."
+msgstr ""
+
+#: admin/class-wp-systemio-connect-admin.php:1579
+msgid "Ajouter un formulaire Divi"
+msgstr ""
+
+#: admin/class-wp-systemio-connect-admin.php:1615
+msgid "ID CSS du Module Formulaire (*)"
+msgstr ""
+
+#: admin/class-wp-systemio-connect-admin.php:1622
+msgid "ID CSS unique défini dans Divi"
+msgstr ""
+
+#: admin/class-wp-systemio-connect-admin.php:1625
+msgid "Doit correspondre à l'ID CSS défini sur le module Formulaire (Avancé > ID et classes CSS > ID CSS)."
+msgstr ""
+
+#: admin/class-wp-systemio-connect-admin.php:1650
+msgid "ID du Champ Email (*)"
+msgstr ""
+
+#: admin/class-wp-systemio-connect-admin.php:1657
+msgid "Ex: contact-email"
+msgstr ""
+
+#: admin/class-wp-systemio-connect-admin.php:1659
+msgid "ID défini sur le champ Email lui-même (Réglages du champ > Avancé > ID de champ)."
+msgstr ""
+
+#: admin/class-wp-systemio-connect-admin.php:1666
+msgid "ID du Champ Prénom"
+msgstr ""
+
+#: admin/class-wp-systemio-connect-admin.php:1673
+msgid "Ex: contact-prenom"
+msgstr ""
+
+#: admin/class-wp-systemio-connect-admin.php:1675
+msgid "ID défini sur le champ Prénom (ou Nom complet). Laisser vide si non utilisé."
+msgstr ""
+
+#: admin/class-wp-systemio-connect-admin.php:1682
+msgid "ID du Champ Nom"
+msgstr ""
+
+#: admin/class-wp-systemio-connect-admin.php:1689
+msgid "Ex: contact-nom"
+msgstr ""
+
+#: admin/class-wp-systemio-connect-admin.php:1691
+msgid "ID défini sur le champ Nom de famille. Laisser vide si non utilisé."
+msgstr ""
+
+#: admin/class-wp-systemio-connect-admin.php:1717
+msgid "Aucun tag trouvé dans votre compte Systeme.io ou l'API n'est pas configurée."
+msgstr ""
+
+#: admin/class-wp-systemio-connect-admin.php:1739
+msgid "Cochez les tags SIO à ajouter au contact lors de la soumission."
+msgstr ""
+
+#: admin/class-wp-systemio-connect-admin.php:1801
+msgid "Êtes-vous sûr de vouloir supprimer la configuration de ce formulaire Divi ?"
+msgstr ""
+
+#: admin/class-wp-systemio-connect-admin.php:1914
+msgid "Ajouter un nouveau contact Systeme.io"
+msgstr ""
+
+#: admin/class-wp-systemio-connect-admin.php:1915
+msgid "Ajouter le Contact"
+msgstr ""
+
+#: admin/class-wp-systemio-connect-admin.php:1921
+msgid "Entrez les informations du contact et sélectionnez les tags à assigner."
+msgstr ""
+
+#: admin/class-wp-systemio-connect-admin.php:1933
+#: admin/class-wp-systemio-contacts-list-table.php:35
+msgid "Email"
+msgstr ""
+
+#: admin/class-wp-systemio-connect-admin.php:1943
+#: admin/class-wp-systemio-contacts-list-table.php:36
+msgid "Prénom"
+msgstr ""
+
+#: admin/class-wp-systemio-connect-admin.php:1952
+#: admin/class-wp-systemio-contacts-list-table.php:37
+msgid "Nom"
+msgstr ""
+
+#: admin/class-wp-systemio-connect-admin.php:1961
+msgid "Assigner des Tags"
+msgstr ""
+
+#: admin/class-wp-systemio-connect-admin.php:1969
+msgid "Erreur de récupération des tags : %s"
+msgstr ""
+
+#: admin/class-wp-systemio-connect-admin.php:1971
+msgid "Aucun tag trouvé dans votre compte Systeme.io."
+msgstr ""
+
+#: admin/class-wp-systemio-connect-admin.php:1987
+msgid "Cochez les tags à assigner à ce nouveau contact."
+msgstr ""
+
+#: admin/class-wp-systemio-connect-admin.php:1997
+msgid "Annuler"
+msgstr ""
+
+#: admin/class-wp-systemio-contacts-list-table.php:22
+msgid "Contact SIO"
+msgstr ""
+
+#: admin/class-wp-systemio-contacts-list-table.php:23
+msgid "Contacts SIO"
+msgstr ""
+
+#: admin/class-wp-systemio-contacts-list-table.php:39
+msgid "Inscrit le"
+msgstr ""
+
+#: admin/class-wp-systemio-contacts-list-table.php:126
+msgid "Aucun contact Systeme.io trouvé."
+msgstr ""
+
+#: includes/class-wp-systemio-connect-api-service.php:71
+msgid "Erreur lors de l'encodage JSON des données."
+msgstr ""
+
+#: includes/class-wp-systemio-connect-api-service.php:256
+msgid "Erreur API Systeme.io (%d) lors de la récupération des contacts: %s"
+msgstr ""

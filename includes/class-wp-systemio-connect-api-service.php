@@ -258,4 +258,3 @@ class WP_Systemio_Connect_Api_Service
     }
 
 } // Fin de la classe WP_Systemio_Connect_Api_Service
-?>

@@ -72,5 +72,22 @@ function wp_systemio_connect_initialize_divi()
 add_action('after_setup_theme', 'wp_systemio_connect_initialize_divi');
 
 
+// Dans wp-systemio-connect.php
 
+/**
+ * Charge le text domain du plugin pour la traduction.
+ */
+function wp_systemio_connect_load_textdomain()
+{
+    load_plugin_textdomain(
+        'wp-systemio-connect',                 // Le Text Domain
+        false,                                 // Deprecated argument
+        dirname(plugin_basename(__FILE__)) . '/languages/' // Chemin relatif vers le dossier /languages/
+    );
+}
+// Accrocher au bon moment (après le chargement des plugins)
+add_action('plugins_loaded', 'wp_systemio_connect_load_textdomain');
+
+// S'assurer que le dossier /languages/ existe bien à la racine du plugin
+// (On l'a créé à l'étape 0)
 ?>

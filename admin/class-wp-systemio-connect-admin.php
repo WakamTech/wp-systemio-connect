@@ -1759,9 +1759,10 @@ class WP_Systemio_Connect_Admin
      * Ajoute le script JS pour le répéteur Divi et l'affichage conditionnel.
      * NOTE : Ce code est très similaire à celui d'Elementor. Une factorisation serait idéale
      * dans une version ultérieure pour éviter la duplication.
+     */    /**
+     * Ajoute le script JS pour le répéteur Divi et l'affichage conditionnel.
      */
-    private static function add_divi_repeater_js()
-    {
+    private static function add_divi_repeater_js() {
         ?>
         <script type="text/javascript">
             document.addEventListener('DOMContentLoaded', function () {
@@ -1769,136 +1770,146 @@ class WP_Systemio_Connect_Admin
                 const template = document.getElementById('wp-sio-divi-form-row-template');
                 const addButton = document.getElementById('wp-sio-add-divi-form');
 
-                if (!container || !template || !addButton) {
-                    console.error('WP SIO Connect: Divi repeater JS elements not found.');
-                    return;
+                // Vérification initiale des éléments principaux
+                if (!container) { console.error('WP SIO Connect: Divi container #wp-sio-divi-forms-container not found.'); return; }
+                if (!template) { console.error('WP SIO Connect: Divi template #wp-sio-divi-form-row-template not found.'); return; }
+                if (!addButton) { console.error('WP SIO Connect: Divi add button #wp-sio-add-divi-form not found.'); return; }
+
+                console.log('WP SIO Connect: Divi Repeater JS Initializing...');
+
+                // --- Fonction pour initialiser une ligne (existante ou nouvelle) ---
+                function initializeFormRow(formConfigDiv) {
+                    console.log('WP SIO Connect: Initializing row:', formConfigDiv);
+                    setupConditionalDisplay(formConfigDiv);
+                    setupRemoveButton(formConfigDiv);
+                    setupCssIdSync(formConfigDiv);
                 }
 
                 // --- Fonction pour gérer l'affichage conditionnel ---
                 function setupConditionalDisplay(formConfigDiv) {
                     const checkbox = formConfigDiv.querySelector('.wp-sio-divi-enable-checkbox');
+                    // Important: Utiliser querySelectorAll pour récupérer une NodeList
                     const conditionalFields = formConfigDiv.querySelectorAll('.wp-sio-divi-conditional-fields');
 
+                    // Vérifier si les éléments sont trouvés
+                    if (!checkbox) { console.warn('WP SIO Connect: Enable checkbox (.wp-sio-divi-enable-checkbox) not found in row:', formConfigDiv); return; }
+                    if (conditionalFields.length === 0) { console.warn('WP SIO Connect: Conditional fields (.wp-sio-divi-conditional-fields) not found in row:', formConfigDiv); return; }
+                    console.log(`WP SIO Connect: Found ${conditionalFields.length} conditional fields for checkbox:`, checkbox);
+
+
                     function toggleFields() {
+                        console.log('WP SIO Connect: Toggling fields. Checkbox checked:', checkbox.checked);
                         conditionalFields.forEach(fieldRow => {
-                            fieldRow.style.display = checkbox.checked ? '' : 'none';
+                            fieldRow.style.display = checkbox.checked ? '' : 'none'; // Utiliser '' pour revenir à l'affichage par défaut (table-row)
                         });
                     }
-                    if (checkbox) {
-                        toggleFields(); // État initial
-                        checkbox.addEventListener('change', toggleFields);
-                    } else {
-                        console.warn('WP SIO Connect: Enable checkbox not found in Divi row', formConfigDiv);
-                    }
+
+                    toggleFields(); // Appliquer l'état initial
+                    checkbox.removeEventListener('change', toggleFields); // Enlever l'ancien listener au cas où
+                    checkbox.addEventListener('change', toggleFields); // Ajouter le listener
                 }
 
                 // --- Fonction pour gérer la suppression ---
                 function setupRemoveButton(formConfigDiv) {
                     const removeButton = formConfigDiv.querySelector('.wp-sio-remove-divi-form');
                     if (removeButton) {
-                        removeButton.addEventListener('click', function (e) {
+                         // Enlever les anciens listeners pour éviter les doublons si ré-initialisé
+                         removeButton.replaceWith(removeButton.cloneNode(true));
+                         // Récupérer le nouveau bouton cloné pour attacher l'event
+                         const newRemoveButton = formConfigDiv.querySelector('.wp-sio-remove-divi-form');
+                         if (!newRemoveButton) return;
+
+                        newRemoveButton.addEventListener('click', function (e) {
                             e.preventDefault();
+                             console.log('WP SIO Connect: Remove button clicked for row:', formConfigDiv);
                             if (confirm('<?php echo esc_js(__('Êtes-vous sûr de vouloir supprimer la configuration de ce formulaire Divi ?', 'wp-systemio-connect')); ?>')) {
                                 formConfigDiv.remove();
-                                // S'assurer qu'il reste au moins une ligne (peut-être vide) pour l'ajout
                                 if (container.querySelectorAll('.wp-sio-divi-form-config').length === 0) {
-                                    addFormRow(); // Ajouter une nouvelle ligne vide si tout est supprimé
+                                    console.log('WP SIO Connect: No rows left, adding empty one.');
+                                    addFormRow();
                                 }
                             }
                         });
                     } else {
-                        console.warn('WP SIO Connect: Remove button not found in Divi row', formConfigDiv);
+                        console.warn('WP SIO Connect: Remove button (.wp-sio-remove-divi-form) not found in row:', formConfigDiv);
                     }
                 }
 
                 // --- Fonction pour synchroniser l'ID CSS dans les attributs name ---
                 function setupCssIdSync(formConfigDiv) {
                     const cssIdInput = formConfigDiv.querySelector('.wp-sio-divi-css-id-input');
-                    if (!cssIdInput) {
-                        console.warn('WP SIO Connect: CSS ID input not found in Divi row', formConfigDiv);
-                        return;
-                    }
+                    if (!cssIdInput) { console.warn('WP SIO Connect: CSS ID input (.wp-sio-divi-css-id-input) not found in row:', formConfigDiv); return; }
 
-                    cssIdInput.addEventListener('input', function () {
-                        // Nettoyer l'ID pour usage comme clé et attribut
-                        // Autorise lettres, chiffres, tiret, underscore. Commence par une lettre ou underscore par sécurité pour CSS.
+                     // Enlever les anciens listeners pour éviter les doublons
+                    cssIdInput.replaceWith(cssIdInput.cloneNode(true));
+                    const newCssIdInput = formConfigDiv.querySelector('.wp-sio-divi-css-id-input');
+                    if (!newCssIdInput) return;
+
+
+                    newCssIdInput.addEventListener('input', function () {
                         let newCssId = this.value.trim();
                         newCssId = newCssId.replace(/[^a-zA-Z0-9_-]/g, '');
-                        if (newCssId.length > 0 && ! /^[a-zA-Z_]/.test(newCssId)) {
-                            newCssId = '_' + newCssId; // Préfixer si ne commence pas par lettre/underscore
+                        if (newCssId.length > 0 && !/^[a-zA-Z_]/.test(newCssId)) {
+                            newCssId = '_' + newCssId;
                         }
 
                         const currentConfigDiv = this.closest('.wp-sio-divi-form-config');
                         const inputsToUpdate = currentConfigDiv.querySelectorAll('[name^="wp_systemio_connect_options[divi_integrations"]');
-                        // ... calcul de newCssId (ou newFormName/newFormId) ...
-                        const replacementKey = newCssId || ('__INDEX__' + Date.now()); // Utilise un index unique si vide
-                        currentConfigDiv.dataset.index = replacementKey;
-                        const currentKey = currentConfigDiv.dataset.index; // L'index actuel ou temporaire
+                        const currentKey = currentConfigDiv.dataset.index || '__INDEX__'; // Clé actuelle
+
+                         console.log(`WP SIO Connect: Syncing CSS ID. New ID: '${newCssId}', Current Key: '${currentKey}'`);
+
+                        const replacementKey = newCssId || currentKey; // Garder l'index si l'ID devient vide ? Ou utiliser un nouveau __INDEX__? Gardons l'index pour la stabilité pendant la saisie.
 
                         inputsToUpdate.forEach(input => {
                             const nameAttr = input.getAttribute('name');
                             if (nameAttr) {
-                                // Remplacer l'index/clé actuelle par le nouvel ID CSS (ou __INDEX__ si vide)
-                                // Regex pour cibler la clé spécifique à cette ligne
-                                const regex = new RegExp(`\\[divi_integrations\\]\\[${currentKey.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&')}\\]`); // Échapper les caractères spéciaux dans la clé actuelle
-                                const replacementKey = newCssId || '__INDEX__';
+                                const regex = new RegExp(`\\[divi_integrations\\]\\[${currentKey.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&')}\\]`);
                                 const newName = nameAttr.replace(regex, `[divi_integrations][${replacementKey}]`);
                                 input.setAttribute('name', newName);
                             }
                         });
-                        // Mettre à jour aussi l'index data
-                        // ... calcul de newCssId (ou newFormName/newFormId) ...
-                        const replacementKey = newCssId || ('__INDEX__' + Date.now()); // Utilise un index unique si vide
-                        // ... remplacer la clé dans les attributs name en utilisant replacementKey ...
-                        currentConfigDiv.dataset.index = replacementKey;
-                        // On pourrait aussi vouloir mettre à jour les ID des champs et les 'for' des labels, mais c'est plus complexe et moins critique pour la sauvegarde
+                        currentConfigDiv.dataset.index = replacementKey; // Mettre à jour le data-index aussi
                     });
                 }
 
 
                 // --- Fonction pour ajouter une nouvelle ligne ---
                 function addFormRow() {
+                    console.log('WP SIO Connect: Adding new Divi form row...');
                     const clone = template.content.cloneNode(true);
-                    const newIndex = '__INDEX__' + Date.now(); // Utiliser un préfixe et timestamp comme index temporaire unique
+                    const newIndex = '__INDEX__' + Date.now();
                     const newRow = clone.querySelector('.wp-sio-divi-form-config');
 
-                    if (!newRow) {
-                        console.error('WP SIO Connect: Could not find .wp-sio-divi-form-config in template clone.');
-                        return;
-                    }
+                    if (!newRow) { console.error('WP SIO Connect: Could not find .wp-sio-divi-form-config in template clone.'); return; }
 
-                    // Remplacer __INDEX__ par le nouvel index unique dans le HTML cloné
-                    // Faire la substitution sur les attributs pertinents plutôt que innerHTML pour préserver les events potentiels
-                    newRow.innerHTML = newRow.innerHTML.replace(/__INDEX__/g, newIndex); // Simple pour cet exemple
-                    newRow.dataset.index = newIndex; // Mettre à jour l'attribut data-index
+                    // Itérer sur tous les éléments avec __INDEX__ et le remplacer
+                    newRow.querySelectorAll('[id*="__INDEX__"], [name*="__INDEX__"], [for*="__INDEX__"]').forEach(el => {
+                        if (el.id) el.id = el.id.replace(/__INDEX__/g, newIndex);
+                        if (el.name) el.name = el.name.replace(/__INDEX__/g, newIndex);
+                        if (el.htmlFor) el.htmlFor = el.htmlFor.replace(/__INDEX__/g, newIndex);
+                    });
+                     newRow.dataset.index = newIndex; // Mettre à jour l'attribut data-index
 
                     container.appendChild(newRow);
+                    console.log('WP SIO Connect: New row added, initializing it:', newRow);
 
-                    // Ré-appliquer les gestionnaires d'événements sur la nouvelle ligne clonée et ajoutée
-                    const addedRowElement = container.querySelector(`[data-index="${newIndex}"]`);
-                    if (addedRowElement) {
-                        setupConditionalDisplay(addedRowElement);
-                        setupRemoveButton(addedRowElement);
-                        setupCssIdSync(addedRowElement);
-                    } else {
-                        console.error('WP SIO Connect: Could not find the newly added Divi row element.');
-                    }
+                    // Initialiser les scripts sur la nouvelle ligne
+                    initializeFormRow(newRow);
                 }
 
                 // --- Initialisation ---
-
-                // Gérer l'ajout
                 addButton.addEventListener('click', function (e) {
                     e.preventDefault();
                     addFormRow();
                 });
 
-                // Appliquer les gestionnaires aux lignes existantes au chargement
+                // Initialiser les lignes existantes au chargement
+                console.log('WP SIO Connect: Initializing existing Divi rows...');
                 container.querySelectorAll('.wp-sio-divi-form-config').forEach(row => {
-                    setupConditionalDisplay(row);
-                    setupRemoveButton(row);
-                    setupCssIdSync(row);
+                    initializeFormRow(row);
                 });
+                console.log('WP SIO Connect: Divi Repeater JS Initialized.');
 
             });
         </script>
